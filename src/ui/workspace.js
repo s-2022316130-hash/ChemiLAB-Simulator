@@ -6,6 +6,7 @@ import { Status, emptyResult } from '../simulation/contract.js';
 import { createPlantView, webglAvailable } from '../scene/renderer.js';
 import { createStreamSystem } from '../scene/streams.js';
 import { createCameraPresets } from '../scene/cameras.js';
+import { CAPTION_MODES, CAPTION_LABEL } from '../scene/labels.js';
 import { createFlowsheet } from '../flowsheet/view2d.js';
 import { equipmentCard } from '../information/equipmentCard.js';
 import { assumptionsPanel } from '../information/assumptions.js';
@@ -32,7 +33,7 @@ export function mountWorkspace(root, sim) {
 
   const plant3d = el('div', { class: 'panel' }, [el('header', {}, [el('span', { text: '3D plant' }), el('span', { id: 'presetbar', class: 'btnrow' })])]);
   const host3d = el('div', { class: 'canvas-host' }); plant3d.appendChild(host3d);
-  const fsPanel = el('div', { class: 'panel' }, [el('header', {}, [el('span', { text: 'Process flow diagram' })])]);
+  const fsPanel = el('div', { class: 'panel' }, [el('header', {}, [el('span', { text: 'Process flow diagram' }), el('span', { id: 'fsbar', class: 'btnrow' })])]);
   const hostFs = el('div', { class: 'canvas-host' }); fsPanel.appendChild(hostFs);
 
   const infoHost = el('div');
@@ -54,12 +55,16 @@ export function mountWorkspace(root, sim) {
     presets = createCameraPresets(view, built.presets || {});
     const bar = plant3d.querySelector('#presetbar');
     presets.list().forEach(p => bar.appendChild(el('button', { class: 'btn', text: p.label, onClick: () => presets.go(p.id) })));
-    // Equipment labels help when reading the plant and get in the way when
-    // looking at it, so the choice belongs to whoever is looking.
-    const labelBtn = el('button', { class: 'btn', text: 'Labels on', onClick: () => {
-      labelBtn.textContent = view.setLabelsVisible(!view.labelsVisible) ? 'Labels on' : 'Labels off';
-    } });
-    bar.appendChild(labelBtn);
+    // Captions help when reading the plant and get in the way when looking at
+    // it, so how much they say belongs to whoever is looking.
+    const capBtn = el('button', {
+      class: 'btn', title: 'Cycle equipment captions: off, tag, tag and name, tag and live readings',
+      text: CAPTION_LABEL[view.captionMode], onClick: () => {
+        const next = CAPTION_MODES[(CAPTION_MODES.indexOf(view.captionMode) + 1) % CAPTION_MODES.length];
+        capBtn.textContent = CAPTION_LABEL[view.setCaptionMode(next)];
+      }
+    });
+    bar.appendChild(capBtn);
   } else {
     host3d.appendChild(el('div', { class: 'fallback', text: 'WebGL is unavailable, so the 3D plant is switched off. The flowsheet below carries the same process state and all results remain available.' }));
   }
@@ -69,6 +74,24 @@ export function mountWorkspace(root, sim) {
     onSelect: tag => store.set({ selection: tag }),
     onHover: tag => store.set({ hover: tag })
   }) : null;
+
+  if (flowsheet) {
+    const fsbar = fsPanel.querySelector('#fsbar');
+    const toggle = (key, label) => {
+      const b = el('button', {
+        class: 'btn', dataset: { on: 'true' }, text: label,
+        onClick: () => {
+          const next = !flowsheet.captions[key];
+          flowsheet.setCaptions({ [key]: next });
+          b.dataset.on = String(next);
+        }
+      });
+      fsbar.appendChild(b);
+    };
+    toggle('tags', 'Tags');
+    toggle('names', 'Names');
+    toggle('streams', 'Stream values');
+  }
 
   // ---- panels ---------------------------------------------------------
   const tour = sim.tour?.length ? createTour(sim.tour, { view, store, flowsheet }) : null;
@@ -96,6 +119,8 @@ export function mountWorkspace(root, sim) {
     const eq = usable ? sim.engine.getEquipmentState(s.result) : {};
     const st = usable ? sim.engine.getStreams(s.result) : [];
     flowsheet?.[usable ? 'applyState' : 'clearState'](st, eq);
+    // Captions show the engine's formatted readings, passed straight through.
+    view?.setEquipmentValues?.(eq);
     streams?.update(usable ? Object.fromEntries(st.map(x => [x.id, x])) : {});
     sim.plant?.applyState?.(eq, st);
   });

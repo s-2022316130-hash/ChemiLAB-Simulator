@@ -7,9 +7,9 @@ const g = (geo, mat, pos = [0, 0, 0], rot = [0, 0, 0]) => {
 };
 export function verticalVessel({ d = 2, h = 5, heads = true, mat = MAT.vessel }) {
   const grp = new THREE.Group();
-  grp.add(g(new THREE.CylinderGeometry(d / 2, d / 2, h, 28), mat, [0, h / 2, 0]));
+  grp.add(g(new THREE.CylinderGeometry(d / 2, d / 2, h, 40), mat, [0, h / 2, 0]));
   if (heads) {
-    const head = new THREE.SphereGeometry(d / 2, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+    const head = new THREE.SphereGeometry(d / 2, 36, 16, 0, Math.PI * 2, 0, Math.PI / 2);
     grp.add(g(head, mat, [0, h, 0]));
     grp.add(g(head, mat, [0, 0, 0], [Math.PI, 0, 0]));
   }
@@ -23,7 +23,7 @@ export function horizontalVessel({ d = 2, l = 6, mat = MAT.vessel }) {
 }
 export function tank({ d = 6, h = 4, cone = 0, mat = MAT.steel, liquidFrac = null }) {
   const grp = new THREE.Group();
-  grp.add(g(new THREE.CylinderGeometry(d / 2, d / 2, h, 32, 1, true), mat, [0, h / 2, 0]));
+  grp.add(g(new THREE.CylinderGeometry(d / 2, d / 2, h, 44, 1, true), mat, [0, h / 2, 0]));
   if (cone > 0) grp.add(g(new THREE.ConeGeometry(d / 2, cone, 32), mat, [0, -cone / 2, 0]));
   if (liquidFrac !== null) {
     const lq = g(new THREE.CylinderGeometry(d / 2 * .98, d / 2 * .98, Math.max(h * liquidFrac, .01), 32), MAT.liquid, [0, h * liquidFrac / 2, 0]);
@@ -216,8 +216,8 @@ export function rotaryDrum({ d = 2, l = 12, axisHeight = 2.2, mat = MAT.steel, f
 export function cyclone({ d = 1.2, barrel = 1.8, cone = 2.2, mat = MAT.vessel }) {
   const grp = new THREE.Group();
   const base = cone;
-  grp.add(g(new THREE.CylinderGeometry(d / 2, d / 2, barrel, 28, 1, true), mat, [0, base + barrel / 2, 0]));
-  grp.add(g(new THREE.ConeGeometry(d / 2, cone, 28, 1, true), mat, [0, base / 2, 0]));
+  grp.add(g(new THREE.CylinderGeometry(d / 2, d / 2, barrel, 40, 1, true), mat, [0, base + barrel / 2, 0]));
+  grp.add(g(new THREE.ConeGeometry(d / 2, cone, 40, 1, true), mat, [0, base / 2, 0]));
   grp.add(g(new THREE.CylinderGeometry(d * .18, d * .18, .5, 14), MAT.steelDark, [0, .25, 0]));
   // Tangential inlet and the vortex finder out of the roof.
   grp.add(g(new THREE.BoxGeometry(d * .5, barrel * .45, d * .28), MAT.steelDark,
@@ -251,6 +251,60 @@ export function screwConveyor({ l = 4, d = .45, mat = MAT.steelDark }) {
   grp.add(g(new THREE.CylinderGeometry(.2, .2, .55, 14), MAT.motor, [l / 2 + .75, 0, 0], [0, 0, Math.PI / 2]));
   grp.add(g(new THREE.BoxGeometry(.4, .35, .4), mat, [-l / 2 + .3, d / 2 + .16, 0]));
   grp.add(g(new THREE.BoxGeometry(.4, .35, .4), mat, [l / 2 - .3, -d / 2 - .16, 0]));
+  return grp;
+}
+/** Caged access ladder. Every vessel and platform on a real plant has one. */
+export function ladder({ h = 4, w = .46, cage = true }) {
+  const grp = new THREE.Group();
+  [-w / 2, w / 2].forEach(x => grp.add(g(new THREE.CylinderGeometry(.035, .035, h, 6), MAT.frame, [x, h / 2, 0])));
+  for (let y = .28; y < h; y += .3) grp.add(g(new THREE.CylinderGeometry(.02, .02, w, 5), MAT.frame, [0, y, 0], [0, 0, Math.PI / 2]));
+  if (cage && h > 2.4) {
+    for (let y = 2.2; y < h; y += .72) {
+      grp.add(g(new THREE.TorusGeometry(.38, .022, 5, 14, Math.PI * 1.25), MAT.frame, [0, y, .1], [0, 0, -Math.PI * .12]));
+    }
+  }
+  return grp;
+}
+/** Raised-face flange pair. Reads as a real pipe joint at close range. */
+export function flange({ d = .2, mat = MAT.steelDark }) {
+  const grp = new THREE.Group();
+  grp.add(g(new THREE.CylinderGeometry(d * 1.9, d * 1.9, .05, 16), mat, [0, .035, 0]));
+  grp.add(g(new THREE.CylinderGeometry(d * 1.9, d * 1.9, .05, 16), mat, [0, -.035, 0]));
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    grp.add(g(new THREE.CylinderGeometry(.018, .018, .14, 5), mat, [Math.cos(a) * d * 1.5, 0, Math.sin(a) * d * 1.5]));
+  }
+  return grp;
+}
+/** Branch nozzle off a vessel wall, with its blank flange. */
+export function nozzle({ d = .18, l = .5, mat = MAT.steelDark }) {
+  const grp = new THREE.Group();
+  grp.add(g(new THREE.CylinderGeometry(d, d, l, 12), mat, [0, l / 2, 0]));
+  grp.add(g(new THREE.CylinderGeometry(d * 1.75, d * 1.75, .06, 14), mat, [0, l, 0]));
+  return grp;
+}
+/** Cable tray on stanchions: the electrical route between the MCC and the plant. */
+export function cableTray({ l = 10, w = .5, y = 3.4 }) {
+  const grp = new THREE.Group();
+  grp.add(g(new THREE.BoxGeometry(l, .06, w), MAT.grating, [0, y, 0]));
+  [-w / 2, w / 2].forEach(z => grp.add(g(new THREE.BoxGeometry(l, .12, .05), MAT.frame, [0, y + .07, z])));
+  for (let x = -l / 2 + .5; x <= l / 2; x += 3.2) {
+    grp.add(g(new THREE.CylinderGeometry(.05, .05, y, 6), MAT.frame, [x, y / 2, 0]));
+  }
+  return grp;
+}
+/** Protective bollard. Small, but it is what makes a plot read as a real plot. */
+export function bollard({ h = 1 }) {
+  const grp = new THREE.Group();
+  grp.add(g(new THREE.CylinderGeometry(.09, .09, h, 10), MAT.valve, [0, h / 2, 0]));
+  grp.add(g(new THREE.CylinderGeometry(.11, .11, .1, 10), MAT.concrete, [0, .05, 0]));
+  return grp;
+}
+/** Sleeper-mounted pipe support for a run at low level. */
+export function pipeSupport({ w = 1.2, h = .6 }) {
+  const grp = new THREE.Group();
+  grp.add(g(new THREE.BoxGeometry(.25, h, w), MAT.concrete, [0, h / 2, 0]));
+  grp.add(g(new THREE.BoxGeometry(.3, .08, w + .1), MAT.frame, [0, h, 0]));
   return grp;
 }
 export function ground({ size = 60 }) {

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { ground } from './geometry.js';
-import { makeLabel, skyTexture, selectionRing } from './labels.js';
+import { makeLabel, updateLabel, skyTexture, selectionRing } from './labels.js';
 import { highlight } from './materials.js';
 import { onFrame, createQualityGovernor } from '../shared/animation.js';
 
@@ -66,7 +66,10 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
 
   const marker = selectionRing(hue); marker.visible = false; scene.add(marker);
   const labels = new THREE.Group(); scene.add(labels);
-  let labelsVisible = true;
+  // Caption detail: off | tag | name | values. Live values are only ever the
+  // engine's own formatted readings for that tag, never anything derived here.
+  let captionMode = 'name';
+  let lastValues = {};
 
   const equipment = new Map();   // tag -> {group, meta}
   const ray = new THREE.Raycaster(); const ptr = new THREE.Vector2();
@@ -106,7 +109,7 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
     controls.update();
     // Labels are billboards: they turn to face the camera and fade out with
     // distance, so a wide shot does not become a wall of text.
-    if (labelsVisible) {
+    if (captionMode !== 'off') {
       // Constant apparent size: work out how many world units one screen pixel
       // covers at the label's distance, so every label reads the same whatever
       // the camera is doing. Far ones fade out so a wide shot stays a plant
@@ -151,11 +154,32 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
       label.userData.tag = meta.tag;
       labels.add(label);
       equipment.get(meta.tag).label = label;
+      updateLabel(label, captionMode, null);
       return group;
     },
-    /** Labels help when reading the plant and clutter when posing it. */
-    setLabelsVisible(on) { labelsVisible = !!on; labels.visible = labelsVisible; return labelsVisible; },
-    get labelsVisible() { return labelsVisible; },
+    /**
+     * Caption detail level. Captions help when reading a plant and get in the
+     * way when looking at it, so how much they say belongs to whoever is looking.
+     */
+    setCaptionMode(mode) {
+      captionMode = ['off', 'tag', 'name', 'values'].includes(mode) ? mode : 'name';
+      labels.visible = captionMode !== 'off';
+      if (captionMode !== 'off') {
+        for (const [tag, e] of equipment) {
+          if (e.label) updateLabel(e.label, captionMode, lastValues[tag]?.values ?? null);
+        }
+      }
+      return captionMode;
+    },
+    get captionMode() { return captionMode; },
+    /** Feed the captions the engine's equipment state, straight through. */
+    setEquipmentValues(state) {
+      lastValues = state || {};
+      if (captionMode !== 'values') return;
+      for (const [tag, e] of equipment) {
+        if (e.label) updateLabel(e.label, captionMode, lastValues[tag]?.values ?? null);
+      }
+    },
     add(obj) { scene.add(obj); return obj; },
     getEquipment: tag => equipment.get(tag) || null,
     listEquipment: () => [...equipment.values()].map(e => e.meta),

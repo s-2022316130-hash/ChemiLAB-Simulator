@@ -15,7 +15,8 @@
 import * as THREE from 'three';
 import {
   basin, tank, agitator, mediaBed, centrifugalPump, blower, pipe, valve,
-  platform, stairs, frame, instrument, cabinet, statusLamp, verticalVessel
+  platform, stairs, frame, instrument, cabinet, statusLamp, verticalVessel,
+  ladder, flange, nozzle, cableTray, bollard, pipeSupport
 } from '../../scene/geometry.js';
 import { MAT, STATE_COLOR } from '../../scene/materials.js';
 import { TAGS, STREAMS } from './engine.js';
@@ -129,6 +130,9 @@ export function build(view, streams) {
     g.add(withPos(valve({ s: 1.2 }), [1.6, 0.9, -1.3]));
     g.add(withPos(valve({ s: 1.2 }), [1.6, 0.9, 1.3]));
     g.add(withPos(instrument({ label: 'FIT' }), [2.3, 1.6, 0]));
+    g.add(withPos(flange({ d: 0.22 }), [1.1, 0.9, -1.3]));
+    g.add(withPos(flange({ d: 0.22 }), [1.1, 0.9, 1.3]));
+    [[-1, 1], [1, 1]].forEach(([sx, sz]) => g.add(withPos(bollard({ h: 0.9 }), [sx * 3, 0, sz * 2.6])));
     lamp(g, refs, TAGS.intakePump, 2.4);
     add(TAGS.intakePump, g, 'Raw water intake pumps', 'pump', { pos: [-30, 7, 8], target: [-24, 1.5, 0] });
   }
@@ -225,6 +229,10 @@ export function build(view, streams) {
     g.add(withPos(stairs({ steps: 20, w: 1.1 }), [d.l / 2 + 1.1, 0, d.w / 2 + 3.2]));
     g.add(withPos(instrument({ label: 'AIT' }), [d.l / 2 + 0.35, 2.4, -2]));
     g.add(withPos(instrument({ label: 'LIT' }), [-d.l / 2 - 0.35, 2.4, 2]));
+    g.add(withPos(ladder({ h: d.h, cage: false }), [-d.l / 2 - 0.35, 0, -2.5]));
+    for (let z = -d.w / 2 + 1.2; z <= d.w / 2 - 1; z += 3) {
+      g.add(withPos(pipeSupport({ w: 1, h: 0.5 }), [-d.l / 2 - 1.7, 0, z]));
+    }
     lamp(g, refs, TAGS.clarifier, d.h + 2.1);
     add(TAGS.clarifier, g, 'Sedimentation basin', 'clarifier', { pos: [4, 13, 15], target: [1, 2, 0] });
   }
@@ -271,6 +279,7 @@ export function build(view, streams) {
     const span = (d.cells - 1) * d.pitch + d.w;
     g.add(withPos(platform({ w: 2.2, d: span + 1.4, y: d.h + 0.1, rails: true }), [d.l / 2 + 1.4, 0, 0]));
     g.add(withPos(stairs({ steps: 14, w: 1.1 }), [d.l / 2 + 1.4, 0, span / 2 + 2.6]));
+    g.add(withPos(ladder({ h: d.h, cage: false }), [-d.l / 2 - 1.4, 0, 0]));
     g.add(withPos(instrument({ label: 'PDI' }), [-d.l / 2 - 1.1, 2.2, 0]));
     g.add(withPos(instrument({ label: 'AIT' }), [d.l / 2 + 0.4, 2.2, span / 2 - 0.5]));
     lamp(g, refs, TAGS.filters, d.h + 2.2);
@@ -304,6 +313,8 @@ export function build(view, streams) {
     g.add(withPos(platform({ w: 6.4, d: 1.6, y: 7.1, rails: true }), [0, 0, 3.6]));
     g.add(withPos(stairs({ steps: 28, w: 1 }), [0, 0, 5.6]));
     g.add(withPos(instrument({ label: 'LIT' }), [2.8, 9.2, 0]));
+    g.add(withPos(ladder({ h: 7 }), [-2.9, 0, 0]));
+    g.add(withPos(nozzle({ d: 0.24, l: 0.6 }), [0, 11.6, 0]));
     lamp(g, refs, TAGS.backwashTank, 12.3);
     add(TAGS.backwashTank, g, 'Backwash water tank', 'tank', { pos: [21, 12, 18], target: [15, 6, 10.5] });
   }
@@ -420,6 +431,13 @@ export function build(view, streams) {
 
   // ---- pipe rack, pipework and stream tracer paths ------------------------
   buildPipeRack(view);
+  // Power and instrument cabling from the motor control centre out to the works.
+  const tray = cableTray({ l: 40, w: 0.55, y: 3.6 });
+  tray.position.set(6, 0, -7.6);
+  view.add(tray);
+  for (const [bx, bz] of [[-22, 3.4], [-16, 3.4], [9, -4.2], [19, -4.2], [30, 3.4]]) {
+    const b = bollard({ h: 0.9 }); b.position.set(bx, 0, bz); view.add(b);
+  }
   const routes = streamRoutes();
   for (const [id, r] of Object.entries(routes)) {
     view.add(pipe(r.path, { r: r.bore, mat: r.mat ?? MAT.pipe }));
