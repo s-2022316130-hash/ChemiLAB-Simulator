@@ -1,19 +1,31 @@
 /**
- * 02 — Industrial Dryer
- * Status: route registered, process model not implemented.
- * Do not start this simulator until the previous one is functionally complete.
+ * 02 — INDUSTRIAL DRYER
+ * Status: complete. Engine, plant, flowsheet, equipment information, guided
+ * tour and scenarios are all implemented and wired.
+ *
+ * Direct-fired co-current rotary drum dryer with a cyclone and a bag filter on
+ * the exhaust: psychrometrics, the moisture and enthalpy balances solved
+ * together, constant and falling rate drying, residence time and drum loading,
+ * entrainment and gas cleaning, and the thermal performance.
+ *
+ * Equipment tags and stream ids are declared once in engine.js and imported by
+ * plant.js and flowsheet.js, so the 3D group, the flowsheet node and the engine
+ * key are the same string and selection sync cannot drift.
  */
+import engine from './engine.js';
+import plant from './plant.js';
+import { FLOWSHEET } from './flowsheet.js';
+import { EQUIPMENT } from './equipment.js';
+import { TOUR } from './tour.js';
+import { SCENARIOS } from './scenarios.js';
+
 export default {
   id: 'industrial-dryer',
   name: 'Industrial Dryer',
-  engine: null, plant: null, flowsheetSpec: null, equipmentInfo: null, tour: null, scenarios: null,
-  plannedScope: [
-    'Wet feed rate, initial and target moisture content (dry basis)',
-    'Drying air: flow, inlet temperature, ambient humidity, heater duty',
-    'Psychrometrics: humidity ratio, wet-bulb temperature, saturation',
-    'Moisture balance and constant/falling rate drying periods',
-    'Energy balance, specific energy consumption, thermal efficiency',
-    'Residence time and dryer loading',
-    'Faults: low air flow, insufficient heating, wet feed surge, high ambient humidity'
-  ]
+  engine,
+  plant,
+  flowsheetSpec: FLOWSHEET,
+  equipmentInfo: EQUIPMENT,
+  tour: TOUR,
+  scenarios: SCENARIOS
 };

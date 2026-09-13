@@ -415,7 +415,7 @@ function solveDryer(x, guess, fx) {
   const hAmbient = airEnthalpy(x.ambientTemp, yIn);
   const hIn = airEnthalpy(x.airTempIn, yIn);
   const tWetBulb = wetBulb(x.airTempIn, yIn);
-  const lambdaWb = tWetBulb === null ? latentHeat(50) : latentHeat(tWetBulb);
+  const lambdaWb = tWetBulb === null ? null : latentHeat(tWetBulb);
 
   // --- drum geometry --------------------------------------------------------
   const area = Math.PI * Math.pow(x.drumDiameter, 2) / 4;
@@ -1073,7 +1073,9 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
 
   // A converged solve can still describe a machine that cannot be operated.
   const infeasible = [];
-  if (s.tauMin <= 0) {
+  if (s.tWetBulb === null || s.lambdaWb === null) {
+    infeasible.push(`The wet-bulb temperature of the drying air did not solve at ${eff.airTempIn.toFixed(0)} °C and a humidity ratio of ${s.yIn.toFixed(4)} kg/kg. Without it there is no surface temperature for the solids and no latent heat to evaporate against, so no result is reported rather than one built on an assumed value.`);
+  } else if (s.tauMin <= 0) {
     infeasible.push(`The gas drag term of ${s.drag.toFixed(1)} min exceeds the conveying time of ${s.conveying.toFixed(1)} min, so the residence time is negative. At a gas-to-solids ratio of ${(s.G / Math.max(s.dryFeed, 1e-9)).toFixed(1)} the air blows the solids straight through the drum. Reduce the air flow, slow the drum, flatten the slope, or use a coarser feed.`);
   } else if (s.deltaTlm === null) {
     infeasible.push(`The air leaves the drum no hotter than the solids, so there is no temperature difference left to drive heat transfer anywhere along the drum. There is no operable state at ${eff.airTempIn.toFixed(0)} °C inlet with ${s.G.toFixed(0)} kg/h of air against this feed.`);

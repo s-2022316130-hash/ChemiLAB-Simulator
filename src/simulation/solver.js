@@ -23,7 +23,15 @@ function blend(x, xn, r) {
   if (typeof x === 'number') return x + r * (xn - x);
   const out = {}; for (const k of Object.keys(xn)) out[k] = x[k] + r * (xn[k] - x[k]); return out;
 }
-export function bisect(f, lo, hi, { tol = 1e-6, maxIter = 80 } = {}) {
+/**
+ * `tol` is the residual tolerance, in the units of f. `xtol` is a separate floor on
+ * the bracket width, in the units of x, and defaults to machine precision. The two
+ * measure different things and must not share a number: a bracket floor set to the
+ * residual tolerance stops the search long before the residual it was asked for was
+ * ever met, and the result then reports as not converged when it simply stopped early.
+ */
+export function bisect(f, lo, hi, { tol = 1e-6, maxIter = 80, xtol = null } = {}) {
+  const xEps = xtol ?? Math.max(Math.abs(lo), Math.abs(hi), 1) * 1e-14;
   let flo = f(lo), fhi = f(hi);
   // A root sitting exactly on an endpoint is still a root. Without these two checks
   // the sign test below cannot bracket it — flo*fm is zero rather than negative — so
@@ -37,7 +45,7 @@ export function bisect(f, lo, hi, { tol = 1e-6, maxIter = 80 } = {}) {
     // The bracket collapsing is a reason to stop, but it is not on its own a reason to
     // claim convergence: a discontinuous residual can pinch to nothing while still
     // sitting far from zero. Only the tolerance actually being met counts.
-    if (Math.abs(fm) < tol || (hi - lo) / 2 < tol) {
+    if (Math.abs(fm) < tol || (hi - lo) / 2 < xEps) {
       return { x: mid, converged: Math.abs(fm) < tol, iterations: i + 1, residual: Math.abs(fm) };
     }
     if (flo * fm <= 0) { hi = mid; fhi = fm; } else { lo = mid; flo = fm; }
