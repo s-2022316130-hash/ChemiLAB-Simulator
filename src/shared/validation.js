@@ -3,7 +3,7 @@
 export const rules = {
   required: () => v => (v === null || v === undefined || v === '' || Number.isNaN(v))
     ? 'Value required — the balance cannot be closed without it.' : null,
-  positive: (what = 'Flow') => v => v <= 0 ? `${what} must be greater than zero; a non-positive flow has no physical meaning here.` : null,
+  positive: (what = 'Flow') => v => v <= 0 ? `${what} must be greater than zero; a non-positive value has no physical meaning here.` : null,
   nonNegative: (what = 'Value') => v => v < 0 ? `${what} cannot be negative.` : null,
   range: (lo, hi, unit = '', why = '') => v => (v < lo || v > hi)
     ? `Outside the validated model range ${lo}–${hi} ${unit}${why ? '. ' + why : '.'}` : null,
