@@ -3,6 +3,7 @@ import { SIMULATORS, getSimulator, STATE_LABEL } from './registry.js';
 import { href } from './router.js';
 
 export function homePage(view) {
+  delete document.documentElement.dataset.sim;
   clear(view).appendChild(el('div', { class: 'home' }, [
     el('h1', { text: 'Run the plant, then find out why it behaves that way.' }),
     el('p', { class: 'lede', text: 'Five process units, each with a working model behind it. Change an operating condition, solve the balances, and watch the same state appear in the plant, the flowsheet and the equations. Every number on screen comes from the model or from a reference value that says so.' }),
@@ -11,7 +12,7 @@ export function homePage(view) {
   return {};
 }
 function simCard(s) {
-  return el('a', { class: 'simcard', href: href.simulator(s.id), dataset: { state: s.state } }, [
+  return el('a', { class: 'simcard', href: href.simulator(s.id), dataset: { state: s.state, id: s.id } }, [
     el('span', { class: 'id', text: s.number }),
     el('span', {}, [el('h3', { text: s.name }), el('small', { text: s.tagline })]),
     el('span', { class: 'pill', text: STATE_LABEL[s.state] })
@@ -22,6 +23,9 @@ export function simulatorsPage(view) { return homePage(view); }
 export async function simulatorPage(view, id) {
   const entry = getSimulator(id);
   clear(view);
+  // The signature hue is set on the root before anything mounts, because the 3D
+  // renderer reads it at construction to tint its lighting and its sky.
+  document.documentElement.dataset.sim = id || '';
   if (!entry) { view.appendChild(el('div', { class: 'home' }, [el('h1', { text: 'Unknown simulator' }), el('a', { href: href.home, text: 'Back to the list' })])); return {}; }
   const mod = (await entry.load()).default;
   if (!mod.engine) {

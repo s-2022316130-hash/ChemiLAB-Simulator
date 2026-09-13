@@ -80,7 +80,7 @@ const stateColor = st => {
   return STATE_COLOR.idle;
 };
 // The drum shell glows with its duty: cold steel when stopped, hot when fired.
-const SHELL_COLD = new THREE.Color(0x8b99a6);
+const SHELL_COLD = new THREE.Color().copy(MAT.steel.color);
 const SHELL_HOT = new THREE.Color(0xc2704a);
 const SOLIDS_WET = new THREE.Color(0x6b5a3f);
 const SOLIDS_DRY = new THREE.Color(0xc6b593);
@@ -127,7 +127,7 @@ export function build(view, streams) {
   // ---- FH-201 feed hopper ---------------------------------------------------
   {
     const d = DIM.hopper, g = new THREE.Group();
-    g.add(hopperVessel({ w: d.w, l: d.l, h: d.h, hopper: d.hopper, mat: MAT.painted }));
+    g.add(hopperVessel({ w: d.w, l: d.l, h: d.h, hopper: d.hopper, mat: MAT.feed }));
     bedIn(g, TAGS.feedHopper, refs, d);
     g.add(withPos(platform({ w: 1.4, d: d.w + 1.2, y: d.hopper + d.h + 0.2, rails: true }), [d.l / 2 + 0.9, 0, 0]));
     g.add(withPos(stairs({ steps: 22, w: 1 }), [d.l / 2 + 0.9, 0, d.w / 2 + 2.8]));
@@ -139,7 +139,7 @@ export function build(view, streams) {
   // ---- SC-201 feed screw ----------------------------------------------------
   {
     const g = new THREE.Group();
-    const sc = screwConveyor({ l: 8, d: 0.5 });
+    const sc = screwConveyor({ l: 8, d: 0.5, mat: MAT.feed });
     sc.position.set(0, 2.4, 0);
     sc.rotation.z = 0.08;
     g.add(sc);
@@ -167,7 +167,7 @@ export function build(view, streams) {
   // ---- H-201 air heater -----------------------------------------------------
   {
     const g = new THREE.Group();
-    const shell = horizontalVessel({ d: 1.8, l: 5.2, mat: MAT.painted });
+    const shell = horizontalVessel({ d: 1.8, l: 5.2, mat: MAT.heating });
     g.add(shell);
     // Burner front and fuel train.
     g.add(withPos(new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.3, 18), MAT.steelDark), [-3.1, 1.5, 0]));
@@ -208,7 +208,7 @@ export function build(view, streams) {
   // ---- CY-201 cyclone -------------------------------------------------------
   {
     const d = DIM.cyclone, g = new THREE.Group();
-    g.add(withPos(cyclone({ d: d.d, barrel: d.barrel, cone: d.cone }), [0, 2.6, 0]));
+    g.add(withPos(cyclone({ d: d.d, barrel: d.barrel, cone: d.cone, mat: MAT.separation }), [0, 2.6, 0]));
     g.add(frame({ w: d.d + 1.2, h: 2.6, d: d.d + 1.2 }));
     g.add(withPos(platform({ w: 1.4, d: d.d + 1.6, y: 2.6 + d.cone + d.barrel * 0.4, rails: true }), [d.d / 2 + 1.1, 0, 0]));
     g.add(withPos(stairs({ steps: 26, w: 1 }), [d.d / 2 + 1.1, 0, d.d / 2 + 3.2]));
@@ -220,7 +220,7 @@ export function build(view, streams) {
   // ---- BF-201 bag filter ----------------------------------------------------
   {
     const d = DIM.bagFilter, g = new THREE.Group();
-    g.add(hopperVessel({ w: d.w, l: d.l, h: d.h, hopper: d.hopper, mat: MAT.painted }));
+    g.add(hopperVessel({ w: d.w, l: d.l, h: d.h, hopper: d.hopper, mat: MAT.separation }));
     // Clean-air plenum and the pulse-jet air receiver on the roof.
     g.add(withPos(new THREE.Mesh(new THREE.BoxGeometry(d.l * 0.9, 0.8, d.w * 0.9), MAT.steelDark), [0, d.hopper + d.h + 0.4, 0]));
     g.add(withPos(tank({ d: 0.5, h: 2.6, mat: MAT.steel }), [d.l * 0.3, d.hopper + d.h + 0.8, -d.w * 0.32]));
@@ -258,7 +258,7 @@ export function build(view, streams) {
   // ---- SC-202 product screw -------------------------------------------------
   {
     const g = new THREE.Group();
-    const sc = screwConveyor({ l: 6.5, d: 0.45 });
+    const sc = screwConveyor({ l: 6.5, d: 0.45, mat: MAT.product });
     sc.position.set(0, 1.5, 0);
     g.add(sc);
     const m = sc.children.find(c => c.isMesh && c.material === MAT.motor);
@@ -272,7 +272,7 @@ export function build(view, streams) {
   // ---- CL-201 product cooler ------------------------------------------------
   {
     const d = DIM.cooler, g = new THREE.Group();
-    const drum = rotaryDrum({ d: d.d, l: d.l, axisHeight: d.axis, flights: 8, mat: MAT.vessel });
+    const drum = rotaryDrum({ d: d.d, l: d.l, axisHeight: d.axis, flights: 8, mat: MAT.product });
     drum.rotation.z = drumTilt;
     g.add(drum);
     refs.rotors.push({ tag: TAGS.cooler, obj: drum.getObjectByName('shell'), base: 1.4, speed: 0 });
@@ -284,7 +284,7 @@ export function build(view, streams) {
   // ---- PB-201 product bin ---------------------------------------------------
   {
     const d = DIM.bin, g = new THREE.Group();
-    g.add(hopperVessel({ w: d.w, l: d.l, h: d.h, hopper: d.hopper, mat: MAT.steel }));
+    g.add(hopperVessel({ w: d.w, l: d.l, h: d.h, hopper: d.hopper, mat: MAT.product }));
     bedIn(g, TAGS.productBin, refs, d);
     g.add(withPos(instrument({ label: 'LIT' }), [-d.l / 2 - 0.3, d.hopper + 1.5, 0]));
     g.add(withPos(instrument({ label: 'MIT' }), [d.l / 2 + 0.3, d.hopper + 1.5, 0]));

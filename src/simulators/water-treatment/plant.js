@@ -136,8 +136,8 @@ export function build(view, streams) {
   // ---- CH-101 coagulant dosing --------------------------------------------
   {
     const g = new THREE.Group();
-    g.add(withPos(tank({ d: 3, h: 4, mat: MAT.painted, liquidFrac: 0.65 }), [-1.6, 0, 0]));
-    g.add(withPos(tank({ d: 2.2, h: 3, mat: MAT.painted, liquidFrac: 0.5 }), [1.6, 0, 0]));
+    g.add(withPos(tank({ d: 3, h: 4, mat: MAT.utility, liquidFrac: 0.65 }), [-1.6, 0, 0]));
+    g.add(withPos(tank({ d: 2.2, h: 3, mat: MAT.utility, liquidFrac: 0.5 }), [1.6, 0, 0]));
     const dp = centrifugalPump({ s: 0.65 });
     dp.position.set(0, 0, -2.2);
     const dm = dp.getObjectByName('motor');
@@ -256,7 +256,7 @@ export function build(view, streams) {
       cellGrp.add(b);
       const liq = b.getObjectByName('liquid');
       if (liq) { liq.visible = false; refs.levels.set(`${TAGS.filters}#${i}`, { mesh: liq, h: d.h, wall: 0.22, frac0: 0.55 }); }
-      const bed = mediaBed({ l: d.l - 0.5, w: d.w - 0.5, h: 1.0 });
+      const bed = mediaBed({ l: d.l - 0.5, w: d.w - 0.5, h: 1.0, mat: MAT.separation });
       bed.position.set(0, 0.22, 0);
       cellGrp.add(bed);
       refs.media.push(bed.getObjectByName('media'));
@@ -296,7 +296,7 @@ export function build(view, streams) {
   {
     const g = new THREE.Group();
     g.add(frame({ w: 5.4, h: 7, d: 5.4 }));
-    const t = tank({ d: 5, h: 4.6, mat: MAT.steel, liquidFrac: 0.8 });
+    const t = tank({ d: 5, h: 4.6, mat: MAT.product, liquidFrac: 0.8 });
     t.position.y = 7;
     g.add(t);
     const liq = t.getObjectByName('liquid');
@@ -335,8 +335,8 @@ export function build(view, streams) {
   // ---- CH-102 chlorine dosing ---------------------------------------------
   {
     const g = new THREE.Group();
-    g.add(withPos(verticalVessel({ d: 1.7, h: 3.4, mat: MAT.painted }), [-1.3, 0, 0]));
-    g.add(withPos(verticalVessel({ d: 1.7, h: 3.4, mat: MAT.painted }), [1.3, 0, 0]));
+    g.add(withPos(verticalVessel({ d: 1.7, h: 3.4, mat: MAT.utility }), [-1.3, 0, 0]));
+    g.add(withPos(verticalVessel({ d: 1.7, h: 3.4, mat: MAT.utility }), [1.3, 0, 0]));
     const dp = centrifugalPump({ s: 0.6 });
     dp.position.set(0, 0, -2.1);
     const dm = dp.getObjectByName('motor');

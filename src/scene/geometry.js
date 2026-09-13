@@ -254,6 +254,9 @@ export function screwConveyor({ l = 4, d = .45, mat = MAT.steelDark }) {
   return grp;
 }
 export function ground({ size = 60 }) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), MAT.concrete);
+  // Slightly lighter and less saturated than the structures standing on it, so
+  // equipment reads against the ground instead of merging into it.
+  const mat = new THREE.MeshStandardMaterial({ color: 0x2b2535, roughness: 1, metalness: 0 });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
   m.rotation.x = -Math.PI / 2; m.receiveShadow = true; return m;
 }

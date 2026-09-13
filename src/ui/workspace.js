@@ -53,7 +53,13 @@ export function mountWorkspace(root, sim) {
     const built = sim.plant.build(view, streams);
     presets = createCameraPresets(view, built.presets || {});
     const bar = plant3d.querySelector('#presetbar');
-    presets.list().forEach(p => bar.appendChild(el('button', { class: 'btn', style: 'padding:3px 7px;font-size:11px', text: p.label, onClick: () => presets.go(p.id) })));
+    presets.list().forEach(p => bar.appendChild(el('button', { class: 'btn', text: p.label, onClick: () => presets.go(p.id) })));
+    // Equipment labels help when reading the plant and get in the way when
+    // looking at it, so the choice belongs to whoever is looking.
+    const labelBtn = el('button', { class: 'btn', text: 'Labels on', onClick: () => {
+      labelBtn.textContent = view.setLabelsVisible(!view.labelsVisible) ? 'Labels on' : 'Labels off';
+    } });
+    bar.appendChild(labelBtn);
   } else {
     host3d.appendChild(el('div', { class: 'fallback', text: 'WebGL is unavailable, so the 3D plant is switched off. The flowsheet below carries the same process state and all results remain available.' }));
   }

@@ -1,6 +1,6 @@
 import { el, clear } from '../shared/dom.js';
 import { panel, kv, collapsible, message } from '../shared/components/panel.js';
-import { val, isEmpty } from '../shared/format.js';
+import { val, num, isEmpty } from '../shared/format.js';
 import { Status } from '../simulation/contract.js';
 import { lineChart, barChart, gauge } from '../shared/components/charts.js';
 /**
@@ -26,7 +26,7 @@ export function createResults(engine, store) {
     }
     const r = result;
     host.append(
-      section('Key performance indicators', (r.kpis || []).map(k => kv(k.label, isEmpty(k.value) ? '—' : val(k.value, k.unit, k.digits ?? 2)))),
+      (r.kpis || []).length ? el('div', { class: 'kpis' }, r.kpis.map(kpiCard)) : null,
       section('Process results', Object.entries(r.results || {}).map(([k, v]) => kv(v.label || k, isEmpty(v.value) ? '—' : val(v.value, v.unit, v.digits ?? 2)))),
       section('Mass balance', Object.entries(r.massBalance || {}).map(([k, v]) => kv(v.label || k, isEmpty(v.value) ? '—' : val(v.value, v.unit, 2)))),
       section('Energy balance', Object.entries(r.energyBalance || {}).map(([k, v]) => kv(v.label || k, isEmpty(v.value) ? '—' : val(v.value, v.unit, 2)))),
@@ -43,6 +43,17 @@ export function createResults(engine, store) {
   }
   store.subKeys(['result', 'status', 'messages', 'level'], render);
   return p;
+}
+/** A headline number reads as a card; the supporting detail stays as rows. */
+function kpiCard(k) {
+  const empty = isEmpty(k.value);
+  return el('div', { class: 'kpi', dataset: { empty: String(empty) }, title: k.label }, [
+    el('span', { class: 'kpi-l', text: k.label }),
+    el('div', {}, [
+      el('span', { class: 'kpi-v', text: empty ? '—' : num(k.value, k.digits ?? 2) }),
+      !empty && k.unit ? el('span', { class: 'kpi-u', text: k.unit }) : null
+    ].filter(Boolean))
+  ]);
 }
 function stepBlock(s) {
   return el('div', { style: 'margin-bottom:10px;border-left:2px solid var(--line);padding-left:8px' }, [
