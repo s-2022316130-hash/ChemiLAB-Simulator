@@ -1,28 +1,30 @@
 /**
  * 01 — WATER TREATMENT PLANT
- * Status: framework wired, process model NOT yet implemented.
+ * Status: complete. Engine, plant, flowsheet, equipment information, guided
+ * tour and scenarios are all implemented and wired.
  *
- * Set `engine` to the real engine (./engine.js) once it satisfies the contract in
- * src/simulation/contract.js. Until then the route renders the honest placeholder
- * instead of a dashboard full of invented numbers.
+ * Conventional surface water treatment: coagulation, flocculation,
+ * sedimentation, rapid gravity filtration and free chlorine disinfection, with
+ * the backwash washwater recovery recycle closed by the shared solver.
+ *
+ * Equipment tags and stream ids are declared once in engine.js and imported by
+ * plant.js and flowsheet.js, so the 3D group, the flowsheet node and the engine
+ * key are the same string and selection sync cannot drift.
  */
+import engine from './engine.js';
+import plant from './plant.js';
+import { FLOWSHEET } from './flowsheet.js';
+import { EQUIPMENT } from './equipment.js';
+import { TOUR } from './tour.js';
+import { SCENARIOS } from './scenarios.js';
+
 export default {
   id: 'water-treatment',
   name: 'Water Treatment Plant',
-  engine: null,          // -> import engine from './engine.js'
-  plant: null,           // -> import plant from './plant.js'
-  flowsheetSpec: null,   // -> import { FLOWSHEET } from './flowsheet.js'
-  equipmentInfo: null,   // -> import { EQUIPMENT } from './equipment.js'
-  tour: null,            // -> import { TOUR } from './tour.js'
-  scenarios: null,       // -> import { SCENARIOS } from './scenarios.js'
-  plannedScope: [
-    'Raw water feed: flow, turbidity, alkalinity, temperature, pH',
-    'Rapid mix and coagulation: coagulant dose, G value, mixing time',
-    'Flocculation: tapered G, residence time, floc growth model',
-    'Sedimentation: overflow rate, surface loading, removal efficiency correlation',
-    'Rapid sand filtration: filtration rate, headloss build-up, backwash trigger',
-    'Disinfection: chlorine demand, residual, CT value against a target log removal',
-    'Sludge production balance and backwash water recovery',
-    'Faults: coagulant underdose, short-circuiting, blocked filter, pump failure, turbidity spike'
-  ]
+  engine,
+  plant,
+  flowsheetSpec: FLOWSHEET,
+  equipmentInfo: EQUIPMENT,
+  tour: TOUR,
+  scenarios: SCENARIOS
 };
