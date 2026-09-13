@@ -15,7 +15,8 @@
 import * as THREE from 'three';
 import {
   rotaryDrum, cyclone, hopperVessel, screwConveyor, tank, horizontalVessel,
-  blower, pipe, valve, platform, stairs, frame, instrument, cabinet, statusLamp
+  blower, pipe, valve, platform, stairs, frame, instrument, cabinet, statusLamp,
+  ladder, flange, nozzle, cableTray, bollard, pipeSupport
 } from '../../scene/geometry.js';
 import { MAT, STATE_COLOR } from '../../scene/materials.js';
 import { TAGS, STREAMS } from './engine.js';
@@ -132,6 +133,9 @@ export function build(view, streams) {
     g.add(withPos(platform({ w: 1.4, d: d.w + 1.2, y: d.hopper + d.h + 0.2, rails: true }), [d.l / 2 + 0.9, 0, 0]));
     g.add(withPos(stairs({ steps: 22, w: 1 }), [d.l / 2 + 0.9, 0, d.w / 2 + 2.8]));
     g.add(withPos(instrument({ label: 'LIT' }), [-d.l / 2 - 0.3, d.hopper + 1.4, 0]));
+    g.add(withPos(ladder({ h: d.hopper + d.h }), [-d.l / 2 - 0.35, 0, 0]));
+    g.add(withPos(nozzle({ d: 0.22, l: 0.5 }), [0, d.hopper + d.h + 0.02, 0]));
+    [[-1, -1], [1, 1]].forEach(([sx, sz]) => g.add(withPos(bollard({}), [sx * 2.6, 0, sz * 2.6])));
     lamp(g, refs, TAGS.feedHopper, d.hopper + d.h + 1.6);
     add(TAGS.feedHopper, g, 'Wet feed hopper', 'tank', { pos: [-26, 8, 9], target: [-21, 3, 0] });
   }
@@ -178,7 +182,10 @@ export function build(view, streams) {
     g.add(flame);
     refs.flame = flame;
     g.add(withPos(valve({ s: 1.1 }), [-3.4, 0.7, 0.9]));
+    g.add(withPos(flange({ d: 0.3 }), [2.9, 1.5, 0]));
+    g.add(withPos(flange({ d: 0.3 }), [-2.9, 1.5, 0]));
     g.add(withPos(instrument({ label: 'TIC' }), [2.9, 2.3, 0]));
+    g.add(withPos(instrument({ label: 'AIT' }), [1.4, 2.4, 0.9]));
     lamp(g, refs, TAGS.heater, 3.4);
     add(TAGS.heater, g, 'Direct-fired air heater', 'heater', { pos: [-18, 6, -15], target: [-15, 2, -9] });
   }
@@ -201,6 +208,14 @@ export function build(view, streams) {
     g.add(withPos(instrument({ label: 'TIT' }), [-d.l / 2 - 1.3, d.axis + 1.5, 0]));
     g.add(withPos(instrument({ label: 'TIT' }), [d.l / 2 + 1.6, d.axis + 1.3, 0]));
     g.add(withPos(instrument({ label: 'MIT' }), [d.l / 2 + 1.6, 1.2, 1.4]));
+    // Access and services along the shell: a drum this size is walked, not admired.
+    g.add(withPos(ladder({ h: d.axis + 0.6 }), [-d.l / 2 - 1.3, 0, 1.6]));
+    g.add(withPos(ladder({ h: d.axis + 0.3 }), [d.l / 2 + 1.5, 0, -1.6]));
+    for (let x = -d.l / 2 + 2; x <= d.l / 2 - 2; x += 4.5) {
+      g.add(withPos(pipeSupport({ w: 1.1, h: 0.55 }), [x, 0, -d.d / 2 - 2.2]));
+    }
+    g.add(withPos(flange({ d: 0.34 }), [-d.l / 2 - 1.35, d.axis, 0]));
+    g.add(withPos(flange({ d: 0.34 }), [d.l / 2 + 1.55, d.axis - 0.3, 0]));
     lamp(g, refs, TAGS.drum, d.axis + d.d / 2 + 1.4);
     add(TAGS.drum, g, 'Rotary drum dryer', 'dryer', { pos: [-3, 11, 16], target: [0, 3, 0] });
   }
@@ -213,6 +228,8 @@ export function build(view, streams) {
     g.add(withPos(platform({ w: 1.4, d: d.d + 1.6, y: 2.6 + d.cone + d.barrel * 0.4, rails: true }), [d.d / 2 + 1.1, 0, 0]));
     g.add(withPos(stairs({ steps: 26, w: 1 }), [d.d / 2 + 1.1, 0, d.d / 2 + 3.2]));
     g.add(withPos(instrument({ label: 'PDI' }), [-d.d / 2 - 0.4, 5.2, 0]));
+    g.add(withPos(ladder({ h: 2.6 + d.cone + d.barrel }), [-d.d / 2 - 0.9, 0, 0]));
+    g.add(withPos(valve({ s: 0.9 }), [0, 1.5, 0]));
     lamp(g, refs, TAGS.cyclone, 2.6 + d.cone + d.barrel + 1.9);
     add(TAGS.cyclone, g, 'Product recovery cyclone', 'clarifier', { pos: [9, 10, 14], target: [12, 5, 7.5] });
   }
@@ -227,6 +244,8 @@ export function build(view, streams) {
     g.add(withPos(platform({ w: 1.4, d: d.w + 1.2, y: d.hopper + d.h + 0.9, rails: true }), [d.l / 2 + 0.9, 0, 0]));
     g.add(withPos(stairs({ steps: 28, w: 1 }), [d.l / 2 + 0.9, 0, d.w / 2 + 3.0]));
     g.add(withPos(instrument({ label: 'PDI' }), [-d.l / 2 - 0.3, d.hopper + 1.8, 0]));
+    g.add(withPos(ladder({ h: d.hopper + d.h + 0.8 }), [-d.l / 2 - 0.4, 0, 1.2]));
+    g.add(withPos(valve({ s: 0.9 }), [0, 1.3, 0]));
     lamp(g, refs, TAGS.bagFilter, d.hopper + d.h + 2.4);
     add(TAGS.bagFilter, g, 'Pulse-jet bag filter', 'filter', { pos: [16, 10, 15], target: [19, 4, 7.5] });
   }
@@ -249,8 +268,9 @@ export function build(view, streams) {
     g.add(tank({ d: d.d, h: d.h, mat: MAT.steelDark }));
     g.add(withPos(new THREE.Mesh(new THREE.TorusGeometry(d.d / 2 + 0.1, 0.06, 6, 20), MAT.steel), [0, d.h - 0.5, 0], [Math.PI / 2, 0, 0]));
     g.add(withPos(instrument({ label: 'AIT' }), [d.d / 2 + 0.3, 3.2, 0]));
-    // Guy frame at the base.
+    // Guy frame and access at the base.
     g.add(frame({ w: 2.4, h: 1.2, d: 2.4 }));
+    g.add(withPos(ladder({ h: d.h - 1.5 }), [d.d / 2 + 0.25, 0, 0]));
     lamp(g, refs, TAGS.stack, d.h + 1.2);
     add(TAGS.stack, g, 'Exhaust stack', 'column', { pos: [33, 12, 13], target: [28.5, 7, 7.5] });
   }
@@ -307,6 +327,14 @@ export function build(view, streams) {
 
   // ---- ducting, pipe rack and tracer paths ----------------------------------
   buildRack(view);
+  // Power and instrument cabling from the motor control centre out to the plant.
+  const tray = cableTray({ l: 34, w: 0.55, y: 3.9 });
+  tray.position.set(6, 0, -6.4);
+  view.add(tray);
+  // Bollards protecting the road-side equipment.
+  for (const [bx, bz] of [[-12, 4.5], [-6, 4.5], [6, 4.5], [17, -3.4], [24, -3.4]]) {
+    const b = bollard({}); b.position.set(bx, 0, bz); view.add(b);
+  }
   const routes = streamRoutes();
   for (const [id, r] of Object.entries(routes)) {
     view.add(pipe(r.path, { r: r.bore, mat: r.mat ?? MAT.pipe }));

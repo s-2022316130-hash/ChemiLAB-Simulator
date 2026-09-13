@@ -8,9 +8,12 @@ import { symbolFor } from './symbols.js';
 export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
   const root = svg('svg', { viewBox: `0 0 ${spec.width} ${spec.height}`, width: '100%', height: '100%', style: 'display:block' });
   const gEdges = svg('g', { 'stroke-linecap': 'round' });
+  const gArrows = svg('g');
   const gNodes = svg('g');
+  const gTags = svg('g');
+  const gNames = svg('g');
   const gLabels = svg('g');
-  root.append(gEdges, gNodes, gLabels);
+  root.append(gEdges, gArrows, gNodes, gTags, gNames, gLabels);
   container.appendChild(root);
 
   const nodeEls = new Map(), edgeEls = new Map(), labelEls = new Map();
@@ -28,29 +31,55 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
     const mid = pts[Math.floor(pts.length / 2)] || pts[0];
     const label = svg('text', { x: mid[0] + 7, y: mid[1] - 7, 'font-size': 13, 'font-family': 'var(--mono)', fill: 'var(--ink-dim)', 'paint-order': 'stroke', stroke: 'var(--bg-0)', 'stroke-width': 4.5, 'stroke-linejoin': 'round', text: '—' });
     gLabels.appendChild(label);
-    edgeEls.set(e.id, { path, glow, flowPath, label });
+    // A flow arrow at the midpoint of the last leg: a process diagram that does
+    // not say which way anything goes is a picture, not a flowsheet.
+    const a = pts[pts.length - 2] || pts[0], b2 = pts[pts.length - 1];
+    const ang = Math.atan2(b2[1] - a[1], b2[0] - a[0]) * 180 / Math.PI;
+    const ax = a[0] + (b2[0] - a[0]) * 0.55, ay = a[1] + (b2[1] - a[1]) * 0.55;
+    const arrow = svg('path', {
+      d: 'M-6 -4.5 L6 0 L-6 4.5 Z', fill: 'var(--line)',
+      transform: `translate(${ax},${ay}) rotate(${ang})`
+    });
+    gArrows.appendChild(arrow);
+    edgeEls.set(e.id, { path, glow, flowPath, label, arrow });
   }
   for (const n of spec.nodes) {
     const g = svg('g', { class: 'fs-node', transform: `translate(${n.x},${n.y})` });
     g.appendChild(symbolFor(n.type, n.label));
-    g.appendChild(svg('text', {
+    const tagText = svg('text', {
       y: 46, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': '700',
       'font-family': 'var(--mono)', fill: 'var(--accent)',
       'paint-order': 'stroke', stroke: 'var(--bg-0)', 'stroke-width': 5, 'stroke-linejoin': 'round',
       text: n.tag
-    }));
-    g.appendChild(svg('text', {
+    });
+    const nameText = svg('text', {
       y: 61, 'text-anchor': 'middle', 'font-size': 11.5, fill: 'var(--ink-faint)',
       'paint-order': 'stroke', stroke: 'var(--bg-0)', 'stroke-width': 4, 'stroke-linejoin': 'round',
       text: n.label || ''
-    }));
+    });
+    gTags.appendChild(tagText); gNames.appendChild(nameText);
+    // Captions ride with the node, but live in their own layers so each kind
+    // can be switched on and off without rebuilding the diagram.
+    tagText.setAttribute('transform', `translate(${n.x},${n.y})`);
+    nameText.setAttribute('transform', `translate(${n.x},${n.y})`);
     g.appendChild(svg('title', { text: `${n.tag} — ${n.label || ''}` }));
     g.addEventListener('click', () => onSelect?.(n.tag));
     g.addEventListener('mouseenter', () => onHover?.(n.tag));
     g.addEventListener('mouseleave', () => onHover?.(null));
     gNodes.appendChild(g); nodeEls.set(n.tag, g);
   }
+  let captions = { tags: true, names: true, streams: true };
+  function applyCaptions() {
+    gTags.style.display = captions.tags ? '' : 'none';
+    gNames.style.display = captions.names ? '' : 'none';
+    gLabels.style.display = captions.streams ? '' : 'none';
+  }
+  applyCaptions();
+
   return {
+    /** Which captions the diagram shows. Independent of what has been solved. */
+    setCaptions(next) { captions = { ...captions, ...next }; applyCaptions(); return { ...captions }; },
+    get captions() { return { ...captions }; },
     select(tag) { nodeEls.forEach((g, t) => g.classList.toggle('sel', t === tag)); },
     hover(tag) { nodeEls.forEach((g, t) => g.classList.toggle('hov', t === tag)); },
     /** streams: engine.getStreams() result; equipment: engine.getEquipmentState() */
@@ -65,6 +94,8 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
         e.glow.setAttribute('stroke', colour);
         e.label.textContent = s.label ?? '—';
         e.label.setAttribute('fill', live ? colour : 'var(--ink-faint)');
+        e.arrow.setAttribute('fill', live ? colour : 'var(--line)');
+        e.arrow.setAttribute('opacity', live ? 1 : 0.45);
       }
       for (const [tag, st] of Object.entries(equipment)) {
         const g = nodeEls.get(tag); if (!g) continue;
@@ -83,6 +114,8 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
         e.glow.setAttribute('opacity', 0);
         e.label.textContent = '—';
         e.label.setAttribute('fill', 'var(--ink-faint)');
+        e.arrow.setAttribute('fill', 'var(--line)');
+        e.arrow.setAttribute('opacity', 0.45);
       });
       nodeEls.forEach(g => {
         const b = g.querySelector('.fs-body'); if (!b) return;

@@ -237,8 +237,14 @@ button{font:inherit;color:inherit}
 }
 
 /* Camera preset bar sits over the canvas rather than crowding the header. */
-#presetbar .btn{padding:4px 10px;font-size:11px;border-radius:99px;font-family:var(--mono);letter-spacing:.03em}
-#presetbar .btn:hover{background:color-mix(in srgb,var(--hue) 26%,var(--bg-3))}
+#presetbar .btn,#fsbar .btn{padding:4px 10px;font-size:11px;border-radius:99px;font-family:var(--mono);letter-spacing:.03em}
+#presetbar .btn:hover,#fsbar .btn:hover{background:color-mix(in srgb,var(--hue) 26%,var(--bg-3))}
+/* A caption toggle shows its own state rather than needing to be clicked to find out. */
+#fsbar .btn[data-on="true"]{
+  background:color-mix(in srgb,var(--hue) 22%,var(--bg-3));
+  border-color:color-mix(in srgb,var(--hue) 50%,var(--line));color:var(--ink);
+}
+#fsbar .btn[data-on="false"]{opacity:.5}
 
 /* --- home ----------------------------------------------------------------- */
 .home{max-width:1120px;margin:0 auto;padding:56px 24px 72px}
