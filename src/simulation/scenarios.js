@@ -20,8 +20,12 @@ export function createScenarioSet(faults = [], challenges = []) {
 }
 // challenge = {id, title, target:{key, op:'<='|'>='|'~', value, unit}, hint}
 export function gradeChallenge(challenge, result) {
-  const v = result?.results?.[challenge.target.key];
-  if (v === null || v === undefined || Number.isNaN(v)) return { graded: false, text: 'Run the simulation to be graded.' };
+  // A results entry is {label, value, unit, digits}; older engines may expose a
+  // bare number. Read the calculated value either way, and treat a field that was
+  // never calculated as ungraded rather than as a failure.
+  const entry = result?.results?.[challenge.target.key];
+  const v = entry !== null && typeof entry === 'object' ? entry.value : entry;
+  if (v === null || v === undefined || Number.isNaN(v) || typeof v !== 'number') return { graded: false, text: 'Run the simulation to be graded.' };
   const { op, value, unit } = challenge.target;
   const pass = op === '<=' ? v <= value : op === '>=' ? v >= value : Math.abs(v - value) <= (challenge.target.tol ?? 0.05 * value);
   return { graded: true, pass, text: `${challenge.title}: ${v.toFixed(2)} ${unit} vs target ${op} ${value} ${unit}` };
