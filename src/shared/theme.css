@@ -6,6 +6,7 @@
   --accent:#35c8e8; --accent-deep:#0e7f99;
   --ok:#3ddc97; --warn:#f2b441; --err:#ff5f57; --calc:#7aa2ff;
   --stream-liq:#3aa0ff; --stream-gas:#b58cff; --stream-steam:#e7eef5; --stream-solid:#c9a227;
+  --stream-liquid:#3aa0ff; --stream-air:#9fd4e8; --stream-slurry:#6f8f6a;
   --r:3px; --pad:14px;
   --font:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
