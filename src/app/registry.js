@@ -12,7 +12,7 @@ export const SIMULATORS = [
     state: 'complete', load: () => import('../simulators/industrial-dryer/index.js') },
   { id: 'fertilizer', number: '03', name: 'Ammonia–Urea Fertilizer Plant',
     tagline: 'Synthesis loop, conversion, recycle, urea reaction and prilling',
-    state: 'planned', load: () => import('../simulators/fertilizer/index.js') },
+    state: 'complete', load: () => import('../simulators/fertilizer/index.js') },
   { id: 'paint', number: '04', name: 'Paint Manufacturing Plant',
     tagline: 'Dispersion, milling, let-down, rheology and batch quality',
     state: 'planned', load: () => import('../simulators/paint/index.js') },

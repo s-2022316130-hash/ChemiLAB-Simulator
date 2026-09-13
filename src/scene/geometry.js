@@ -307,6 +307,43 @@ export function pipeSupport({ w = 1.2, h = .6 }) {
   grp.add(g(new THREE.BoxGeometry(.3, .08, w + .1), MAT.frame, [0, h, 0]));
   return grp;
 }
+/**
+ * Multi-stage centrifugal compressor train on a baseplate, with its driver.
+ * The big rotating machines of a synthesis loop or a gas plant.
+ */
+export function compressorTrain({ stages = 2, d = 1.1, l = 2.0, mat = MAT.vessel }) {
+  const grp = new THREE.Group();
+  const span = stages * (l + .35);
+  grp.add(g(new THREE.BoxGeometry(span + 2.6, .35, d + 1.6), MAT.concrete, [0, .17, 0]));
+  for (let i = 0; i < stages; i++) {
+    const x = -span / 2 + l / 2 + i * (l + .35);
+    grp.add(g(new THREE.CylinderGeometry(d / 2, d / 2, l, 28), mat, [x, d / 2 + .5, 0], [0, 0, Math.PI / 2]));
+    [-1, 1].forEach(sx => grp.add(g(new THREE.CylinderGeometry(d / 2 * 1.12, d / 2 * 1.12, .16, 24), MAT.steelDark,
+      [x + sx * l / 2, d / 2 + .5, 0], [0, 0, Math.PI / 2])));
+    grp.add(g(new THREE.BoxGeometry(.45, .55, .45), MAT.frame, [x, .5, 0]));
+  }
+  // Driver and coupling at one end.
+  const drive = g(new THREE.CylinderGeometry(d * .42, d * .42, 1.7, 22), MAT.motor, [span / 2 + 1.2, d / 2 + .5, 0], [0, 0, Math.PI / 2]);
+  drive.name = 'motor'; grp.add(drive);
+  grp.add(g(new THREE.CylinderGeometry(.14, .14, .5, 10), MAT.steelDark, [span / 2 + .3, d / 2 + .5, 0], [0, 0, Math.PI / 2]));
+  return grp;
+}
+/**
+ * Spherical pressure storage on legs: liquefied gases under pressure, which is
+ * how ammonia and LPG are held.
+ */
+export function sphereTank({ d = 6, legs = 6, mat = MAT.vessel }) {
+  const grp = new THREE.Group();
+  const r = d / 2, base = r + 1.6;
+  grp.add(g(new THREE.SphereGeometry(r, 36, 24), mat, [0, base, 0]));
+  grp.add(g(new THREE.TorusGeometry(r * .92, .07, 8, 40), MAT.steelDark, [0, base, 0], [Math.PI / 2, 0, 0]));
+  for (let i = 0; i < legs; i++) {
+    const a = (i / legs) * Math.PI * 2;
+    grp.add(g(new THREE.CylinderGeometry(.13, .13, base, 8), MAT.frame,
+      [Math.cos(a) * r * .8, base / 2, Math.sin(a) * r * .8]));
+  }
+  return grp;
+}
 export function ground({ size = 60 }) {
   // Slightly lighter and less saturated than the structures standing on it, so
   // equipment reads against the ground instead of merging into it.
