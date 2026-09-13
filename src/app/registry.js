@@ -6,7 +6,7 @@
 export const SIMULATORS = [
   { id: 'water-treatment', number: '01', name: 'Water Treatment Plant',
     tagline: 'Coagulation, flocculation, sedimentation, filtration, disinfection',
-    state: 'scaffold', load: () => import('../simulators/water-treatment/index.js') },
+    state: 'complete', load: () => import('../simulators/water-treatment/index.js') },
   { id: 'industrial-dryer', number: '02', name: 'Industrial Dryer',
     tagline: 'Convective drying, humidity and moisture balances, thermal efficiency',
     state: 'planned', load: () => import('../simulators/industrial-dryer/index.js') },
