@@ -9,7 +9,7 @@ export const SIMULATORS = [
     state: 'complete', load: () => import('../simulators/water-treatment/index.js') },
   { id: 'industrial-dryer', number: '02', name: 'Industrial Dryer',
     tagline: 'Convective drying, humidity and moisture balances, thermal efficiency',
-    state: 'planned', load: () => import('../simulators/industrial-dryer/index.js') },
+    state: 'complete', load: () => import('../simulators/industrial-dryer/index.js') },
   { id: 'fertilizer', number: '03', name: 'Ammonia–Urea Fertilizer Plant',
     tagline: 'Synthesis loop, conversion, recycle, urea reaction and prilling',
     state: 'planned', load: () => import('../simulators/fertilizer/index.js') },

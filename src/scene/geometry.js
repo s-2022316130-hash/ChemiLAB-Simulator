@@ -174,7 +174,89 @@ export function statusLamp({ r = .17 } = {}) {
   }));
   m.name = 'lamp'; m.castShadow = false; return m;
 }
+/**
+ * Inclined rotating drum on trunnion piers: rotary dryers, kilns, coolers,
+ * granulators. The axis runs along local X so the turning parts, grouped as
+ * 'shell', spin about x. Tilt the whole group to give it its slope.
+ */
+export function rotaryDrum({ d = 2, l = 12, axisHeight = 2.2, mat = MAT.steel, flights = 8 }) {
+  const grp = new THREE.Group();
+  const shell = new THREE.Group(); shell.name = 'shell';
+  shell.position.y = axisHeight;
+  shell.add(g(new THREE.CylinderGeometry(d / 2, d / 2, l, 32, 1, true), mat, [0, 0, 0], [0, 0, Math.PI / 2]));
+  // Riding rings and the girth gear turn with the shell.
+  [-l * 0.3, l * 0.3].forEach(xp =>
+    shell.add(g(new THREE.TorusGeometry(d / 2 + .07, .11, 8, 28), MAT.steelDark, [xp, 0, 0], [0, Math.PI / 2, 0])));
+  shell.add(g(new THREE.TorusGeometry(d / 2 + .13, .09, 8, 44), MAT.steelDark, [l * 0.14, 0, 0], [0, Math.PI / 2, 0]));
+  // Lifting flights, seen through the open ends.
+  for (let i = 0; i < flights; i++) {
+    const a = (i / flights) * Math.PI * 2;
+    const f = g(new THREE.BoxGeometry(l * .96, .16, .04), MAT.steelDark,
+      [0, Math.cos(a) * (d / 2 - .12), Math.sin(a) * (d / 2 - .12)], [a, 0, 0]);
+    shell.add(f);
+  }
+  grp.add(shell);
+  // Trunnion piers and their rollers stay still.
+  [-l * 0.3, l * 0.3].forEach(xp => {
+    const pierH = Math.max(axisHeight - d / 2 - .25, .3);
+    grp.add(g(new THREE.BoxGeometry(.9, pierH, d + .9), MAT.concrete, [xp, pierH / 2, 0]));
+    [-1, 1].forEach(sz => grp.add(g(new THREE.CylinderGeometry(.22, .22, .34, 14), MAT.steelDark,
+      [xp, pierH + .22, sz * (d / 2 + .12)], [0, 0, Math.PI / 2])));
+  });
+  // Drive: motor, reducer and pinion beside the girth gear.
+  grp.add(g(new THREE.BoxGeometry(1.5, .3, 1.2), MAT.concrete, [l * .14, .15, d / 2 + 1.1]));
+  grp.add(g(new THREE.BoxGeometry(.7, .55, .6), MAT.steelDark, [l * .14, .58, d / 2 + 1.3]));
+  grp.add(g(new THREE.CylinderGeometry(.27, .27, .8, 16), MAT.motor, [l * .14, .72, d / 2 + .7], [Math.PI / 2, 0, 0]));
+  return grp;
+}
+/**
+ * Reverse-flow cyclone: barrel, cone, tangential inlet and vortex finder.
+ * The standard gas–solid separator, so it recurs across the simulators.
+ */
+export function cyclone({ d = 1.2, barrel = 1.8, cone = 2.2, mat = MAT.vessel }) {
+  const grp = new THREE.Group();
+  const base = cone;
+  grp.add(g(new THREE.CylinderGeometry(d / 2, d / 2, barrel, 28, 1, true), mat, [0, base + barrel / 2, 0]));
+  grp.add(g(new THREE.ConeGeometry(d / 2, cone, 28, 1, true), mat, [0, base / 2, 0]));
+  grp.add(g(new THREE.CylinderGeometry(d * .18, d * .18, .5, 14), MAT.steelDark, [0, .25, 0]));
+  // Tangential inlet and the vortex finder out of the roof.
+  grp.add(g(new THREE.BoxGeometry(d * .5, barrel * .45, d * .28), MAT.steelDark,
+    [d * .42, base + barrel * .72, d * .3]));
+  grp.add(g(new THREE.CylinderGeometry(d * .22, d * .22, barrel * .9, 16), MAT.steelDark,
+    [0, base + barrel + barrel * .25, 0]));
+  return grp;
+}
+/**
+ * Rectangular vessel on a pyramidal hopper: feed hoppers, product bins,
+ * baghouses. The hopper is what makes it discharge rather than bridge.
+ */
+export function hopperVessel({ w = 2.4, l = 2.4, h = 3, hopper = 1.6, mat = MAT.steel }) {
+  const grp = new THREE.Group();
+  grp.add(g(new THREE.BoxGeometry(l, h, w), mat, [0, hopper + h / 2, 0]));
+  const cone = new THREE.ConeGeometry(Math.max(l, w) * .72, hopper, 4);
+  grp.add(g(cone, mat, [0, hopper / 2, 0], [Math.PI, Math.PI / 4, 0]));
+  grp.add(g(new THREE.CylinderGeometry(.16, .16, .45, 12), MAT.steelDark, [0, -.15, 0]));
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) =>
+    grp.add(g(new THREE.BoxGeometry(.12, hopper, .12), MAT.frame, [sx * l * .46, hopper / 2, sz * w * .46])));
+  return grp;
+}
+/**
+ * Enclosed screw conveyor with its drive. Solids handling between units.
+ * The trough runs along local X.
+ */
+export function screwConveyor({ l = 4, d = .45, mat = MAT.steelDark }) {
+  const grp = new THREE.Group();
+  grp.add(g(new THREE.CylinderGeometry(d / 2, d / 2, l, 16), mat, [0, 0, 0], [0, 0, Math.PI / 2]));
+  grp.add(g(new THREE.BoxGeometry(.5, .45, .5), MAT.steelDark, [l / 2 + .3, 0, 0]));
+  grp.add(g(new THREE.CylinderGeometry(.2, .2, .55, 14), MAT.motor, [l / 2 + .75, 0, 0], [0, 0, Math.PI / 2]));
+  grp.add(g(new THREE.BoxGeometry(.4, .35, .4), mat, [-l / 2 + .3, d / 2 + .16, 0]));
+  grp.add(g(new THREE.BoxGeometry(.4, .35, .4), mat, [l / 2 - .3, -d / 2 - .16, 0]));
+  return grp;
+}
 export function ground({ size = 60 }) {
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), MAT.concrete);
+  // Slightly lighter and less saturated than the structures standing on it, so
+  // equipment reads against the ground instead of merging into it.
+  const mat = new THREE.MeshStandardMaterial({ color: 0x2b2535, roughness: 1, metalness: 0 });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
   m.rotation.x = -Math.PI / 2; m.receiveShadow = true; return m;
 }
