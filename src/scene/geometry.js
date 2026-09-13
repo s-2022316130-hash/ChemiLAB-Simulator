@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MAT } from './materials.js';
+import { MAT, STATE_COLOR } from './materials.js';
 // Reusable industrial primitives. Simulator plants compose these — never raw boxes.
 const g = (geo, mat, pos = [0, 0, 0], rot = [0, 0, 0]) => {
   const m = new THREE.Mesh(geo, mat); m.position.set(...pos); m.rotation.set(...rot);
@@ -113,6 +113,66 @@ export function cabinet({ w = 1, h = 2, d = .6 }) {
   grp.add(g(new THREE.BoxGeometry(w, h, d), MAT.cabinet, [0, h / 2, 0]));
   grp.add(g(new THREE.BoxGeometry(w * .8, h * .25, .02), MAT.instrument, [0, h * .7, d / 2 + .01]));
   return grp;
+}
+/**
+ * Rectangular open-top concrete basin: mixing chambers, flocculators, clarifiers,
+ * contact tanks, clearwells. `l` runs along X, `w` along Z.
+ * The liquid body is named 'liquid' so a plant module can drive its level.
+ */
+export function basin({ w = 6, l = 10, h = 4, wall = .3, mat = MAT.concrete, liquidFrac = null }) {
+  const grp = new THREE.Group();
+  grp.add(g(new THREE.BoxGeometry(l, wall, w), mat, [0, wall / 2, 0]));
+  grp.add(g(new THREE.BoxGeometry(l, h, wall), mat, [0, h / 2, -w / 2 + wall / 2]));
+  grp.add(g(new THREE.BoxGeometry(l, h, wall), mat, [0, h / 2, w / 2 - wall / 2]));
+  grp.add(g(new THREE.BoxGeometry(wall, h, w - wall * 2), mat, [-l / 2 + wall / 2, h / 2, 0]));
+  grp.add(g(new THREE.BoxGeometry(wall, h, w - wall * 2), mat, [l / 2 - wall / 2, h / 2, 0]));
+  if (liquidFrac !== null) {
+    const lh = Math.max(h * liquidFrac, .01);
+    const lq = g(new THREE.BoxGeometry(l - wall * 2, lh, w - wall * 2), MAT.liquid, [0, wall + lh / 2, 0]);
+    lq.name = 'liquid'; grp.add(lq);
+  }
+  return grp;
+}
+/**
+ * Shaft agitator with paddle blades, sitting on the basin floor with its drive
+ * above the coping. The turning parts are grouped as 'rotor' so a plant module
+ * can spin them at a speed the engine reports, and leave them still when it does not.
+ */
+export function agitator({ h = 4, d = 1.6, blades = 2 }) {
+  const grp = new THREE.Group();
+  grp.add(g(new THREE.BoxGeometry(.8, .12, .8), MAT.frame, [0, h + .2, 0]));
+  grp.add(g(new THREE.BoxGeometry(.55, .3, .55), MAT.steelDark, [0, h + .41, 0]));
+  grp.add(g(new THREE.CylinderGeometry(.26, .26, .62, 14), MAT.motor, [0, h + .87, 0]));
+  const rotor = new THREE.Group(); rotor.name = 'rotor';
+  rotor.add(g(new THREE.CylinderGeometry(.08, .08, h + .2, 10), MAT.steelDark, [0, (h + .2) / 2, 0]));
+  for (let i = 0; i < blades; i++) {
+    const y = h * (.26 + .46 * (blades === 1 ? 0 : i / (blades - 1)));
+    rotor.add(g(new THREE.BoxGeometry(d, .3, .05), MAT.steel, [0, y, 0]));
+    rotor.add(g(new THREE.BoxGeometry(.05, .3, d), MAT.steel, [0, y, 0]));
+  }
+  grp.add(rotor);
+  return grp;
+}
+/**
+ * Granular media bed on its support floor: sand and anthracite filters, packed
+ * adsorbers, ion-exchange beds. The bed is named 'media' so its loading can be shown.
+ */
+export function mediaBed({ w = 3, l = 3, h = 1.1, mat = MAT.steelDark }) {
+  const grp = new THREE.Group();
+  grp.add(g(new THREE.BoxGeometry(l, .16, w), MAT.concrete, [0, .08, 0]));
+  const bed = g(new THREE.BoxGeometry(l, h, w), mat.clone(), [0, .16 + h / 2, 0]);
+  bed.name = 'media'; grp.add(bed);
+  return grp;
+}
+/**
+ * Equipment status lamp. Carries its own material so colouring one never
+ * colours every other item sharing a palette entry.
+ */
+export function statusLamp({ r = .17 } = {}) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), new THREE.MeshStandardMaterial({
+    color: STATE_COLOR.idle, emissive: STATE_COLOR.idle, emissiveIntensity: .9, roughness: .4
+  }));
+  m.name = 'lamp'; m.castShadow = false; return m;
 }
 export function ground({ size = 60 }) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), MAT.concrete);
