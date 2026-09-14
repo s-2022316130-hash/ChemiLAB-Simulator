@@ -1009,6 +1009,10 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   border:1px solid var(--line);border-radius:var(--r-lg);
   box-shadow:var(--sh-1), var(--edge);
   cursor:pointer;text-align:left;color:inherit;
+  /* Inherited by every piece of text on the card. It is the card's own ground
+     colour, not a glow — it does nothing over the flat part of a tile and keeps
+     small type crisp where the photograph runs under it. */
+  text-shadow:var(--tile-ink-shadow);
   transition:transform var(--dur-3) var(--ease-out), box-shadow var(--dur-3) var(--ease),
              border-color var(--dur-3) var(--ease), background var(--dur-3) var(--ease);
   animation:rise var(--dur-4) var(--ease-out) backwards;
@@ -1044,18 +1048,23 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   box-shadow:inset 0 0 14px -6px color-mix(in srgb,var(--card-hue,var(--hue)) 80%, transparent);
 }
 .simtile h3{margin:1px 0 4px;font-size:var(--t-h3);font-weight:600;letter-spacing:-.018em;color:var(--ink)}
+/* Everything on a tile is set a step brighter and a step heavier than the same
+   thing would be on a plain panel, and carries a shadow of the card's own
+   ground. Type that reads as quiet and secondary against a flat surface reads
+   as *faded* against a photograph — the picture supplies texture at exactly the
+   frequency small type is made of, and the contrast that was deliberate stops
+   looking deliberate. */
 .simtile .cat{
-  font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-ghost);
+  font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink-dim);font-weight:600;
   transition:color var(--dur-2) var(--ease);
 }
 .simtile small{
-  color:var(--ink-faint);font-size:var(--t-small);line-height:1.55;display:block;max-width:62ch;
+  color:var(--ink-dim);font-size:var(--t-small);font-weight:500;line-height:1.55;
+  display:block;max-width:62ch;
   transition:color var(--dur-2) var(--ease);
 }
-/* The supporting text comes up a step as the photograph does. The two dimmest
-   things on the card are the two that a brightening image costs the most. */
-.simtile:hover .cat{color:var(--ink-faint)}
-.simtile:hover small{color:var(--ink-dim)}
+.simtile:hover .cat,.simtile:hover small{color:var(--ink)}
 /* What the unit actually contains, in the space the tile was leaving empty.
    Every one of these is a count the verification harness checks against the
    module itself, which is the only reason they are allowed on the page. */
@@ -1076,7 +1085,7 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   font-family:var(--mono);font-size:12px;font-weight:600;color:var(--card-hue,var(--hue));
   letter-spacing:-.02em;font-variant-numeric:tabular-nums;
 }
-.tmeta span{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-ghost)}
+.tmeta span{font-family:var(--mono);font-size:8.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
 
 .simtile .tile-foot{
   margin-top:auto;padding-top:14px;display:flex;align-items:center;gap:10px;
@@ -1092,7 +1101,7 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 .simtile .launch{
   display:inline-flex;align-items:center;gap:7px;
   font-size:var(--t-fine);font-weight:600;color:var(--card-hue,var(--hue));
-  opacity:.7;transition:opacity var(--dur-2) var(--ease);
+  opacity:.88;transition:opacity var(--dur-2) var(--ease);
 }
 .simtile:hover .launch{opacity:1}
 .simtile .launch svg{
@@ -1311,8 +1320,21 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   padding:0 2px 2px;
 }
 .signature .role{
-  font-family:var(--mono);font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-ghost);
+  display:flex;flex-direction:column;gap:3px;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink-faint);line-height:1.6;max-width:min(100%,430px);
 }
+.signature .role .inst{color:var(--ink-ghost);letter-spacing:.2em}
+/* The address is a link and has to look like one, but it is the last line of a
+   signature rather than a call to action — so it is the rule under it that
+   carries the colour, not the text. */
+.signature .contact{
+  margin-top:4px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  color:var(--ink-faint);text-decoration:none;padding-bottom:2px;
+  border-bottom:1px solid color-mix(in srgb,var(--hue) 34%,transparent);
+  transition:color var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+.signature .contact:hover{color:var(--hue);border-bottom-color:var(--hue)}
 /* The understated form, used at the end of a simulator workspace. */
 .signature[data-compact="true"]{padding:14px 0 4px;gap:5px}
 .signature[data-compact="true"] .rule{display:none}
@@ -1321,7 +1343,8 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   font-size:14.5px;
   background:none;-webkit-text-fill-color:currentColor;color:var(--ink-faint);
 }
-.signature[data-compact="true"] .role{display:none}
+.signature[data-compact="true"] .role,
+.signature[data-compact="true"] .contact{display:none}
 
 /* ===========================================================================
    ONE SCREEN AT A TIME — the phone workspace.
