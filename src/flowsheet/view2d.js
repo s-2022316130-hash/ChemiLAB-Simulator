@@ -7,6 +7,18 @@ import { symbolFor } from './symbols.js';
  */
 export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
   const root = svg('svg', { viewBox: `0 0 ${spec.width} ${spec.height}`, width: '100%', height: '100%', style: 'display:block' });
+  // Drafting paper: a faint dot grid behind the diagram and a soft shadow under
+  // every symbol. Both are static, so they cost one paint and nothing after it.
+  const defs = svg('defs', {}, [
+    svg('pattern', { id: 'fs-dots', width: 24, height: 24, patternUnits: 'userSpaceOnUse' }, [
+      svg('circle', { cx: 1.2, cy: 1.2, r: 1.2, fill: 'var(--line)', opacity: 0.55 })
+    ]),
+    svg('filter', { id: 'fs-shadow', x: '-30%', y: '-30%', width: '160%', height: '160%' }, [
+      svg('feDropShadow', { dx: 0, dy: 1.5, stdDeviation: 2, 'flood-color': 'var(--ink)', 'flood-opacity': 0.16 })
+    ])
+  ]);
+  root.appendChild(defs);
+  root.appendChild(svg('rect', { x: 0, y: 0, width: spec.width, height: spec.height, fill: 'url(#fs-dots)' }));
   const gEdges = svg('g', { 'stroke-linecap': 'round' });
   const gArrows = svg('g');
   const gNodes = svg('g');
@@ -22,11 +34,16 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
   for (const e of spec.edges) {
     const pts = e.points || [pos[e.from], pos[e.to]];
     const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0]} ${p[1]}`).join(' ');
-    const path = svg('path', { d, fill: 'none', stroke: 'var(--line)', 'stroke-width': 3, 'stroke-linejoin': 'round' });
+    const path = svg('path', { d, fill: 'none', stroke: 'var(--line-strong)', 'stroke-width': 3, 'stroke-linejoin': 'round' });
     // A wide, low-opacity copy under the line gives a live stream a glow without
     // needing an SVG filter, which is expensive to animate.
     const glow = svg('path', { d, fill: 'none', stroke: 'var(--stream-liq)', 'stroke-width': 11, opacity: 0, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
-    const flowPath = svg('path', { d, fill: 'none', stroke: 'var(--stream-liq)', 'stroke-width': 3, opacity: 0, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
+    // Marching dashes along a live line. Same rule as the 3D tracers: this only
+    // moves where the engine reported a flow, so a still line means a dead line.
+    const flowPath = svg('path', {
+      class: 'fs-flow', "data-live": 'false', d, fill: 'none', stroke: 'var(--stream-liq)',
+      'stroke-width': 3.4, opacity: 0, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+    });
     gEdges.append(path, glow, flowPath);
     const mid = pts[Math.floor(pts.length / 2)] || pts[0];
     const label = svg('text', { x: mid[0] + 7, y: mid[1] - 7, 'font-size': 13, 'font-family': 'var(--mono)', fill: 'var(--ink-dim)', 'paint-order': 'stroke', stroke: 'var(--bg-0)', 'stroke-width': 4.5, 'stroke-linejoin': 'round', text: '—' });
@@ -37,14 +54,14 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
     const ang = Math.atan2(b2[1] - a[1], b2[0] - a[0]) * 180 / Math.PI;
     const ax = a[0] + (b2[0] - a[0]) * 0.55, ay = a[1] + (b2[1] - a[1]) * 0.55;
     const arrow = svg('path', {
-      d: 'M-6 -4.5 L6 0 L-6 4.5 Z', fill: 'var(--line)',
+      d: 'M-7 -5 L7 0 L-7 5 Z', fill: 'var(--line-strong)',
       transform: `translate(${ax},${ay}) rotate(${ang})`
     });
     gArrows.appendChild(arrow);
     edgeEls.set(e.id, { path, glow, flowPath, label, arrow });
   }
   for (const n of spec.nodes) {
-    const g = svg('g', { class: 'fs-node', transform: `translate(${n.x},${n.y})` });
+    const g = svg('g', { class: 'fs-node', transform: `translate(${n.x},${n.y})`, filter: 'url(#fs-shadow)' });
     g.appendChild(symbolFor(n.type, n.label));
     const tagText = svg('text', {
       y: 46, 'text-anchor': 'middle', 'font-size': 14, 'font-weight': '700',
@@ -90,6 +107,7 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
         const colour = `var(--stream-${s.phase || 'liq'})`;
         e.flowPath.setAttribute('opacity', live ? 0.95 : 0);
         e.flowPath.setAttribute('stroke', colour);
+        e.flowPath.setAttribute('data-live', String(live));
         e.glow.setAttribute('opacity', live ? 0.16 : 0);
         e.glow.setAttribute('stroke', colour);
         e.label.textContent = s.label ?? '—';
@@ -111,17 +129,18 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
       // diagram should not imply that anything has.
       edgeEls.forEach(e => {
         e.flowPath.setAttribute('opacity', 0);
+        e.flowPath.setAttribute('data-live', 'false');
         e.glow.setAttribute('opacity', 0);
         e.label.textContent = '—';
         e.label.setAttribute('fill', 'var(--ink-faint)');
-        e.arrow.setAttribute('fill', 'var(--line)');
-        e.arrow.setAttribute('opacity', 0.45);
+        e.arrow.setAttribute('fill', 'var(--line-strong)');
+        e.arrow.setAttribute('opacity', 0.5);
       });
       nodeEls.forEach(g => {
         const b = g.querySelector('.fs-body'); if (!b) return;
         b.setAttribute('stroke', b.style.color || 'var(--ink-dim)');
-        b.setAttribute('stroke-opacity', '0.55');
-        b.setAttribute('stroke-width', '1.6');
+        b.setAttribute('stroke-opacity', '0.9');
+        b.setAttribute('stroke-width', '2');
       });
     },
     dispose() { clear(container); }

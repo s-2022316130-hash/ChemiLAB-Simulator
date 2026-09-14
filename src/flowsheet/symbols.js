@@ -18,8 +18,8 @@ const FUNCTION_COLOR = {
 const body = (node, kind) => {
   node.setAttribute('class', 'fs-body');
   node.setAttribute('stroke', S);
-  node.setAttribute('fill', 'var(--bg-2)');
-  node.setAttribute('stroke-width', '1.6');
+  node.setAttribute('fill', 'var(--bg-1)');
+  node.setAttribute('stroke-width', '2');
   if (kind) node.style.color = FUNCTION_COLOR[kind] || S;
   return node;
 };
@@ -39,7 +39,7 @@ export const SYMBOLS = {
   clarifier: () => svg('g', {}, [body(svg('path', { d: 'M-22 -16 H22 L0 22 Z' }))]),
   mixer: () => svg('g', {}, [body(svg('rect', { x: -16, y: -18, width: 32, height: 36 })), svg('path', { d: 'M0 -18 V6 M-8 6 H8', stroke: S, fill: 'none' })]),
   dryer: () => svg('g', {}, [body(svg('rect', { x: -26, y: -14, width: 52, height: 28, rx: 6 })), svg('path', { d: 'M-14 6 q6 -12 12 0 q6 12 12 0', fill: 'none', stroke: S })]),
-  valve: () => svg('g', {}, [svg('path', { d: 'M-11 -9 L11 9 L11 -9 L-11 9 Z', fill: 'var(--bg-2)', stroke: 'var(--valve,var(--ink-dim))', class: 'fs-body' })]),
+  valve: () => svg('g', {}, [svg('path', { d: 'M-11 -9 L11 9 L11 -9 L-11 9 Z', fill: 'var(--bg-1)', stroke: 'var(--valve,var(--ink-dim))', class: 'fs-body' })]),
   instrument: (label = '') => svg('g', {}, [body(svg('circle', { r: 12 })), svg('text', { y: 4, 'text-anchor': 'middle', 'font-size': 9, fill: A, 'font-family': 'var(--mono)', text: label })]),
   block: () => svg('g', {}, [body(svg('rect', { x: -22, y: -16, width: 44, height: 32 }))])
 };
@@ -54,7 +54,7 @@ export function symbolFor(type, label) {
   g.querySelectorAll('.fs-body').forEach(b => {
     b.style.color = c;
     b.setAttribute('stroke', c);
-    b.setAttribute('stroke-opacity', '0.55');
+    b.setAttribute('stroke-opacity', '0.9');
   });
   return g;
 }

@@ -1,10 +1,13 @@
 import { el, clear } from '../shared/dom.js';
 import { SIMULATORS, getSimulator, STATE_LABEL } from './registry.js';
 import { href } from './router.js';
+import { invalidateTokens } from '../shared/theme.js';
 
 export function homePage(view) {
   delete document.documentElement.dataset.sim;
+  invalidateTokens();
   clear(view).appendChild(el('div', { class: 'home' }, [
+    el('span', { class: 'eyebrow', text: 'Process simulation laboratory' }),
     el('h1', { text: 'Run the plant, then find out why it behaves that way.' }),
     el('p', { class: 'lede', text: 'Five process units, each with a working model behind it. Change an operating condition, solve the balances, and watch the same state appear in the plant, the flowsheet and the equations. Every number on screen comes from the model or from a reference value that says so.' }),
     el('div', { class: 'simlist' }, SIMULATORS.map(simCard))
@@ -26,6 +29,7 @@ export async function simulatorPage(view, id) {
   // The signature hue is set on the root before anything mounts, because the 3D
   // renderer reads it at construction to tint its lighting and its sky.
   document.documentElement.dataset.sim = id || '';
+  invalidateTokens();
   if (!entry) { view.appendChild(el('div', { class: 'home' }, [el('h1', { text: 'Unknown simulator' }), el('a', { href: href.home, text: 'Back to the list' })])); return {}; }
   const mod = (await entry.load()).default;
   if (!mod.engine) {
