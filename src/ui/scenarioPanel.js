@@ -33,7 +33,7 @@ export function createScenarioPanel(sim, store) {
         const g = gradeChallenge(c, result);
         host.appendChild(el('div', { class: 'msg', dataset: { lvl: g.graded ? (g.pass ? 'info' : 'warning') : '' } }, [
           el('div', { text: c.title }),
-          el('div', { style: 'color:var(--ink-faint);font-size:11.5px', text: g.text })
+          el('div', { style: 'color:var(--ink-faint);font-size:11.5px', text: g.detail ?? g.text })
         ]));
       }
     }

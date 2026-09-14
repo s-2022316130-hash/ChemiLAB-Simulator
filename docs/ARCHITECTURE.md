@@ -51,6 +51,38 @@ result → engine.getStreams()       ─┼→ streams.update()   (3D tracers)
 
 When status is not COMPLETE or WARNING, the flowsheet is cleared and tracers stop.
 
+## The five engines
+
+Each simulator is one folder under `src/simulators/` and shares nothing with the others
+but the contract, the solver and the shared utilities. What each one is actually built
+around is worth knowing before changing it:
+
+| Unit | Solved rather than assumed | The idea it exists to teach |
+|---|---|---|
+| 01 water-treatment | Carbonate-buffer pH after alum addition | Coagulant dose is a stoichiometric demand on alkalinity, not a recipe |
+| 02 industrial-dryer | Coupled moisture and enthalpy balance, by bisection | Three limits — heat, time, and what the air can still hold — and which one binds |
+| 03 fertilizer | Two recycle loops, by successive substitution | Overall conversion follows recovery, not what the reactor manages per pass |
+| 04 paint | Batch temperature against a viscosity that depends on it | Λ = PVC/CPVC decides the film; dispersion needs stress, not mixing |
+| 05 gas-processing | Rachford–Rice at every flash, and a bubble point | A sequence of specifications; three towers, one Kremser relation |
+
+Simulators 03, 04 and 05 each re-use one relation in several places on purpose — the
+recycle relation, the Krieger–Dougherty viscosity, and Kremser's absorption factor
+respectively — and the tour text for each says so. That repetition is the teaching.
+
+## Verification
+
+`npm run verify` runs `scripts/verify.mjs` against every engine with no browser involved.
+It checks the identity between engine, flowsheet and equipment cards in both directions,
+the flowsheet geometry, the full contract, that no calculated field leaks a value before a
+run, that the neighbourhood of the base case still solves, and then fuzzes twenty thousand
+random operating points per engine looking for anything thrown, any non-finite value
+reported, and any result reported without convergence.
+
+A high proportion of random points failing is expected and is not a defect: most random
+combinations of nineteen independent operating variables do not describe an operable
+plant. What matters is that every failure is a stated physical reason with a message that
+says what to change.
+
 ## Solver honesty
 
 `solver.js` returns `{converged, iterations, residual, history}`. `runtime.js` maps that
