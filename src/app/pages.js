@@ -4,6 +4,7 @@ import { href } from './router.js';
 import { invalidateTokens } from '../shared/theme.js';
 import { icon } from '../shared/icons.js';
 import { previewNode } from './previews.js';
+import { backdropFor } from './backdrops.js';
 import { createHeroField } from './heroField.js';
 import { heroPlantNode } from './heroPlant.js';
 import { signature, AUTHOR } from '../shared/components/signature.js';
@@ -113,6 +114,33 @@ function sectionHead(kicker, title, body) {
 }
 
 /**
+ * The industrial still behind a tile.
+ *
+ * It is decoration, so it is aria-hidden and carries an empty alt: the tile
+ * already says what the unit is in words, and a screen reader announcing "a
+ * photograph of a water treatment plant" after that is noise.
+ *
+ * It arrives lazily, decodes off the main thread and fades in when it lands.
+ * Until then the gradient placeholder underneath is what is on screen, in the
+ * tile's own colour — so a tile that is still loading looks deliberate rather
+ * than broken, and nothing moves when the picture arrives.
+ */
+function tilePhoto(id) {
+  const src = backdropFor(id);
+  if (!src) return null;
+  const img = el('img', {
+    class: 'tile-photo-img', src, alt: '', loading: 'lazy', decoding: 'async',
+    dataset: { ready: 'false' }
+  });
+  const show = () => { img.dataset.ready = 'true'; };
+  // A cached image can be complete before the listener is attached, in which
+  // case no load event is ever coming.
+  if (img.complete && img.naturalWidth) show();
+  else img.addEventListener('load', show, { once: true });
+  return el('div', { class: 'tile-photo', 'aria-hidden': 'true' }, [img]);
+}
+
+/**
  * One tile in the gallery. The whole tile is the link — a "launch" affordance
  * that is the only clickable part of a card is a smaller target pretending to
  * be a bigger one.
@@ -126,6 +154,7 @@ function simTile(s, i) {
     style: `animation-delay:${40 + i * 55}ms`,
     'aria-label': `${s.name} — ${s.tagline}`
   }, [
+    tilePhoto(s.id),
     previewNode(s.id),
     el('div', { class: 'tile-top' }, [
       el('span', { class: 'id', text: s.number }),

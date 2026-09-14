@@ -2,6 +2,10 @@ import { el, clear } from '../shared/dom.js';
 import { href } from './router.js';
 import { getTheme, toggleTheme, onThemeChange } from '../shared/theme.js';
 import { icon } from '../shared/icons.js';
+// The mark is a real file rather than a string in here, so the same artwork is
+// the masthead, the favicon and anything else that ever needs it. Inlined at
+// build time, which is also what keeps the one-file build self-contained.
+import logoMark from '../../assets/chemilab-logo.svg?raw';
 
 /**
  * Application shell: the masthead and the view it frames.
@@ -18,7 +22,17 @@ import { icon } from '../shared/icons.js';
 
 const SIGNIFIER = 'Process simulation';
 
+/** The tab icon, from the same artwork as the masthead. */
+function setFavicon() {
+  const link = document.querySelector('link[rel="icon"]') || el('link', { rel: 'icon' });
+  link.type = 'image/svg+xml';
+  link.href = `data:image/svg+xml,${encodeURIComponent(logoMark)}`;
+  if (!link.isConnected) document.head.appendChild(link);
+}
+
 export function createShell(mount) {
+  setFavicon();
+
   const view = el('main', { class: 'view' });
 
   const nav = el('nav', {}, [
@@ -44,7 +58,9 @@ export function createShell(mount) {
 
   const top = el('header', { class: 'topbar' }, [
     el('a', { class: 'brand', href: href.home, title: 'ChemiLAB Simulator' }, [
-      el('span', { class: 'mark', text: 'CL' }),
+      // aria-hidden: the wordmark beside it already names the product, and a
+      // link that reads "ChemiLAB ChemiLAB Virtual plant" helps nobody.
+      el('span', { class: 'mark', html: logoMark, 'aria-hidden': 'true' }),
       el('span', { class: 'wordmark' }, [
         el('b', { text: 'ChemiLAB' }),
         el('span', { text: 'Virtual plant' })

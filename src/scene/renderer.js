@@ -542,6 +542,59 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
       });
     },
 
+    /**
+     * A still of the plant at an arbitrary size, for the asset pipeline.
+     *
+     * The gallery backdrops are photographs of these same plants rather than
+     * stock industrial photography. That was a licensing decision before it was
+     * an aesthetic one — but it turns out to be the better picture as well: the
+     * subject is exactly the process the tile is about, down to the vessel, and
+     * a plant that gets rebuilt can simply be re-photographed.
+     *
+     * What comes out is the plant and nothing that belongs to *operating* it.
+     * Captions live in a separate scene that the composer never renders, so
+     * they are absent already; the selection ring and the hover outline are
+     * switched off here. Bloom is forced on regardless of what the quality
+     * governor has decided about this machine, because an offline render has no
+     * frame budget to hold.
+     *
+     * The read-back is synchronous and immediately after the render. The
+     * context is created without a preserved drawing buffer, so those pixels
+     * exist only until the browser next composites — a capture one task later
+     * comes back blank.
+     *
+     * Nothing in the running application calls this; tools/backdrops.js does.
+     */
+    capture({ width = 1600, height = 700, type = 'image/webp', quality = 0.82 } = {}) {
+      const hadMarker = marker.visible;
+      const hadOutline = outlinePass.enabled;
+      const hadBloom = bloomPass.enabled;
+      const hadDpr = renderer.getPixelRatio();
+
+      marker.visible = false;
+      outlinePass.enabled = false;
+      bloomPass.enabled = true;
+
+      renderer.setPixelRatio(1);
+      composer.setPixelRatio(1);
+      renderer.setSize(width, height, false);
+      composer.setSize(width, height);
+      bloomPass.setSize(Math.max(Math.round(width / 2), 128), Math.max(Math.round(height / 2), 128));
+      camera.aspect = width / height;
+      applyFov();
+      renderer.shadowMap.needsUpdate = true;
+      composer.render(0);
+      const url = renderer.domElement.toDataURL(type, quality);
+
+      marker.visible = hadMarker;
+      outlinePass.enabled = hadOutline;
+      bloomPass.enabled = hadBloom;
+      renderer.setPixelRatio(hadDpr);
+      composer.setPixelRatio(hadDpr);
+      resize();
+      return url;
+    },
+
     /** Place the camera at a preset immediately, framed for this panel. */
     jumpTo(pos, target = [0, 4, 0]) {
       camera.position.copy(framed(pos, target));

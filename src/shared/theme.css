@@ -96,13 +96,17 @@ hr{border:0;border-top:1px solid var(--line-soft);margin:14px 0}
   transition:background var(--dur-4) var(--ease);
 }
 .brand{display:flex;align-items:center;gap:10px;flex:0 0 auto;min-width:0}
+/* The mark carries its own plate and its own colours — see the comment in
+   assets/chemilab-logo.svg. It is the one thing on the page that does not take
+   the active simulator's hue, which is the point: the hairline under this bar
+   changes with the plant, the brand above it does not. */
 .brand .mark{
   width:30px;height:30px;border-radius:8px;flex:0 0 auto;position:relative;overflow:hidden;
-  display:grid;place-items:center;
-  background:linear-gradient(150deg,var(--hue),var(--hue-deep));
-  box-shadow:0 3px 12px -3px var(--hue-glow), var(--edge-strong);
-  color:var(--on-accent);font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:-.05em;
+  display:block;
+  box-shadow:0 3px 12px -4px rgba(3,8,16,.7), var(--edge-strong);
+  transition:filter var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
 }
+.brand .mark svg{display:block;width:100%;height:100%}
 /* A slow diagonal sheen across the mark. It is the one piece of pure ornament
    in the shell and it is two degrees away from invisible. */
 .brand .mark::after{
@@ -110,6 +114,7 @@ hr{border:0;border-top:1px solid var(--line-soft);margin:14px 0}
   background:linear-gradient(115deg,transparent 40%,rgba(255,255,255,.42) 50%,transparent 60%);
   transform:translateX(-100%);
 }
+.brand:hover .mark{filter:brightness(1.07);box-shadow:0 4px 14px -4px rgba(3,8,16,.78), var(--edge-strong)}
 .brand:hover .mark::after{animation:sweep 1.1s var(--ease-out)}
 .brand .wordmark{display:flex;flex-direction:column;line-height:1.15;min-width:0}
 .brand b{font-size:13.5px;letter-spacing:.01em;font-weight:650;white-space:nowrap}
@@ -163,7 +168,10 @@ hr{border:0;border-top:1px solid var(--line-soft);margin:14px 0}
 /* The parts of the masthead drop out in order of what they are worth. */
 @media (max-width:1080px){ .brand .wordmark > span{display:none} }
 @media (max-width:880px){ .crumbs .leaf, .crumbs .leaf + i{display:none} }
-@media (max-width:720px){ .brand .wordmark{display:none} .topbar nav a{padding:6px 10px} }
+/* The product name survives to the phone; only the sub-line goes. A masthead
+   carrying a mark and nothing else is a mark nobody can name. */
+@media (max-width:720px){ .topbar nav a{padding:6px 10px} }
+@media (max-width:340px){ .brand .wordmark{display:none} }
 @media (max-width:520px){ .crumbs{display:none} }
 
 /* ===========================================================================
@@ -1001,6 +1009,10 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   border:1px solid var(--line);border-radius:var(--r-lg);
   box-shadow:var(--sh-1), var(--edge);
   cursor:pointer;text-align:left;color:inherit;
+  /* Inherited by every piece of text on the card. It is the card's own ground
+     colour, not a glow — it does nothing over the flat part of a tile and keeps
+     small type crisp where the photograph runs under it. */
+  text-shadow:var(--tile-ink-shadow);
   transition:transform var(--dur-3) var(--ease-out), box-shadow var(--dur-3) var(--ease),
              border-color var(--dur-3) var(--ease), background var(--dur-3) var(--ease);
   animation:rise var(--dur-4) var(--ease-out) backwards;
@@ -1010,8 +1022,8 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 .simtile:nth-child(1){grid-column:span 6;min-height:212px}
 /* Paint order inside a tile. A negative z-index would put the preview behind
    the tile's own background and make it invisible, so the layers are stated:
-   preview and wash at 0, content at 1. */
-.simtile > *:not(.preview){position:relative;z-index:1}
+   photograph, preview and wash at 0, content at 1. */
+.simtile > *:not(.preview):not(.tile-photo){position:relative;z-index:1}
 /* The wash of the tile's own colour, revealed on hover. */
 .simtile::after{
   content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.42;
@@ -1036,10 +1048,23 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   box-shadow:inset 0 0 14px -6px color-mix(in srgb,var(--card-hue,var(--hue)) 80%, transparent);
 }
 .simtile h3{margin:1px 0 4px;font-size:var(--t-h3);font-weight:600;letter-spacing:-.018em;color:var(--ink)}
+/* Everything on a tile is set a step brighter and a step heavier than the same
+   thing would be on a plain panel, and carries a shadow of the card's own
+   ground. Type that reads as quiet and secondary against a flat surface reads
+   as *faded* against a photograph — the picture supplies texture at exactly the
+   frequency small type is made of, and the contrast that was deliberate stops
+   looking deliberate. */
 .simtile .cat{
-  font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-ghost);
+  font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink-dim);font-weight:600;
+  transition:color var(--dur-2) var(--ease);
 }
-.simtile small{color:var(--ink-faint);font-size:var(--t-small);line-height:1.55;display:block;max-width:62ch}
+.simtile small{
+  color:var(--ink-dim);font-size:var(--t-small);font-weight:500;line-height:1.55;
+  display:block;max-width:62ch;
+  transition:color var(--dur-2) var(--ease);
+}
+.simtile:hover .cat,.simtile:hover small{color:var(--ink)}
 /* What the unit actually contains, in the space the tile was leaving empty.
    Every one of these is a count the verification harness checks against the
    module itself, which is the only reason they are allowed on the page. */
@@ -1060,7 +1085,7 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   font-family:var(--mono);font-size:12px;font-weight:600;color:var(--card-hue,var(--hue));
   letter-spacing:-.02em;font-variant-numeric:tabular-nums;
 }
-.tmeta span{font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-ghost)}
+.tmeta span{font-family:var(--mono);font-size:8.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
 
 .simtile .tile-foot{
   margin-top:auto;padding-top:14px;display:flex;align-items:center;gap:10px;
@@ -1076,10 +1101,17 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 .simtile .launch{
   display:inline-flex;align-items:center;gap:7px;
   font-size:var(--t-fine);font-weight:600;color:var(--card-hue,var(--hue));
-  opacity:.7;transition:opacity var(--dur-2) var(--ease), gap var(--dur-2) var(--ease);
+  opacity:.88;transition:opacity var(--dur-2) var(--ease);
 }
-.simtile:hover .launch{opacity:1;gap:10px}
-.simtile .launch svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.simtile:hover .launch{opacity:1}
+.simtile .launch svg{
+  width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  /* The arrow moves on a transform rather than on the row's gap: a gap that
+     animates relays out the footer on every frame of the hover, a transform
+     does not touch layout at all. */
+  transition:transform var(--dur-2) var(--ease-out);
+}
+.simtile:hover .launch svg{transform:translateX(3px)}
 .simtile[data-state=planned]{opacity:.6;--card-hue:var(--ink-ghost)}
 .simtile[data-state=planned]:hover{transform:none;box-shadow:var(--sh-1),var(--edge)}
 
@@ -1109,6 +1141,96 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   stroke-dasharray:6 14;opacity:0;
 }
 .simtile:hover .preview .pv-flow{opacity:.95;animation:dash 1s linear infinite}
+
+/* --- the industrial still ---------------------------------------------------
+   Each tile is backed by a wide photograph of the plant it opens — a render of
+   the actual three.js scene, taken offline by tools/backdrops.js.
+
+   Five layers, bottom to top: the photograph, a scrim that protects the text
+   region, the simulator's colour atmosphere (the tile's existing ::after wash,
+   which paints over this because a pseudo-element is the last child), a
+   vignette, and the content above all of it at z-index 1.
+
+   The intent is that the picture reads as the material the card is made of and
+   not as a picture with a black panel dropped on it. Two things do most of that
+   work: the scrim is a gradient rather than a flat fill, so there is nowhere a
+   hard edge could announce itself, and the photograph is desaturated towards
+   the tile's own hue rather than left at full colour and then dimmed. */
+.simtile .tile-photo{
+  position:absolute;inset:0;z-index:0;overflow:hidden;border-radius:inherit;pointer-events:none;
+  /* On screen before the image lands, and still there behind it afterwards, so
+     a tile that is loading looks deliberate and nothing shifts when it arrives. */
+  background:
+    linear-gradient(118deg, color-mix(in srgb,var(--card-hue,var(--hue)) 14%, transparent), transparent 64%),
+    var(--surface-2);
+}
+.simtile .tile-photo-img{
+  position:absolute;inset:0;z-index:0;width:100%;height:100%;
+  object-fit:cover;object-position:var(--photo-pos,50% 50%);
+  opacity:0;transform:scale(1);transform-origin:64% 50%;
+  /* Set once, never animated. A filter that changes per frame repaints the full
+     surface of a large image; opacity and transform are handed to the
+     compositor and cost nothing per frame. */
+  filter:saturate(.78) contrast(1.02) brightness(1.4);
+  transition:opacity var(--dur-3) var(--ease), transform var(--dur-3) var(--ease-out);
+}
+.simtile .tile-photo-img[data-ready="true"]{opacity:var(--photo)}
+.simtile:hover .tile-photo-img[data-ready="true"]{opacity:var(--photo-hi);transform:scale(1.035)}
+/* The text protection grows with the photograph.
+   Hovering takes the image from a fifth of its strength to a third, and the
+   scrim that was enough at a fifth is not enough at a third — the category line
+   and the tagline start having to be looked for. So a second, wider scrim fades
+   in on exactly the same curve as the image behind it. It is a separate layer
+   because `background-image` does not interpolate: animating the gradient
+   itself would snap to the new stops on the first frame of the hover, which is
+   the one thing more noticeable than the problem it fixes.
+
+   Paint order has to be stated. A ::before is the element's *first* child, so
+   it would sit under the image; these three z-indexes put the image at the
+   bottom, the hover scrim over it and the resting scrim over both. */
+.simtile .tile-photo::before{
+  content:"";position:absolute;inset:0;z-index:1;opacity:0;
+  background:linear-gradient(101deg, var(--tile-scrim) 0px,
+    var(--tile-scrim-soft) min(340px,60%), transparent min(580px,94%));
+  transition:opacity var(--dur-3) var(--ease);
+}
+.simtile:hover .tile-photo::before{opacity:1}
+
+/* Scrim and vignette travel with the photograph rather than with the tile, so
+   a tile without one is not left carrying a shadow of nothing. */
+.simtile .tile-photo::after{
+  content:"";position:absolute;inset:0;z-index:2;
+  background:
+    /* Pixels first, then capped as a fraction. What this gradient protects is
+       the text column, and the text column is about the same width on a tile
+       spanning half the grid as on one spanning all of it — so in per cent
+       alone it leaves the wide tile clear and covers a narrow one entirely.
+       In pixels alone it does the reverse on a small window, where a paired
+       tile is narrower than the 470 px the scrim wanted and so never reaches
+       clear at all. The `min()` is both rules: the pixel figure while there is
+       room for it, a proportion of the card when there is not. */
+    linear-gradient(101deg, var(--tile-scrim) 0px,
+      var(--tile-scrim-soft) min(240px,48%), transparent min(470px,84%)),
+    /* Only as far up as the footer row actually reaches. At 44 % this met the
+       vignette across the middle of the card and the two of them between them
+       covered the whole area the photograph was meant to be seen in. */
+    linear-gradient(0deg, var(--tile-scrim) 0%, transparent 34%),
+    radial-gradient(132% 122% at 64% 40%, transparent 48%, var(--tile-vignette) 100%);
+}
+/* Light is not the dark values with a paler scrim. These are night renders, and
+   a night render laid on white at any opacity is a grey cloud — so on paper it
+   is lifted and flattened into a pale steel image first, and then allowed to be
+   present at nearly twice the opacity for the same visual weight. */
+[data-theme="light"] .simtile .tile-photo-img{filter:saturate(.6) contrast(1.08) brightness(1)}
+
+/* Where each frame is cropped. The stills are 1600 × 700 and a tile shows a
+   strip out of the middle of that, so this is choosing which part of the plant
+   survives the crop rather than a decorative nudge. */
+.simtile[data-id=water-treatment] .tile-photo-img{--photo-pos:52% 58%}
+.simtile[data-id=industrial-dryer] .tile-photo-img{--photo-pos:44% 52%}
+.simtile[data-id=fertilizer] .tile-photo-img{--photo-pos:64% 54%}
+.simtile[data-id=paint] .tile-photo-img{--photo-pos:50% 56%}
+.simtile[data-id=gas-processing] .tile-photo-img{--photo-pos:46% 60%}
 
 /* Per-simulator tile hues. Kept here rather than inline so one file owns
    colour, and both themes are stated rather than derived. */
@@ -1198,8 +1320,21 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   padding:0 2px 2px;
 }
 .signature .role{
-  font-family:var(--mono);font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-ghost);
+  display:flex;flex-direction:column;gap:3px;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink-faint);line-height:1.6;max-width:min(100%,430px);
 }
+.signature .role .inst{color:var(--ink-ghost);letter-spacing:.2em}
+/* The address is a link and has to look like one, but it is the last line of a
+   signature rather than a call to action — so it is the rule under it that
+   carries the colour, not the text. */
+.signature .contact{
+  margin-top:4px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  color:var(--ink-faint);text-decoration:none;padding-bottom:2px;
+  border-bottom:1px solid color-mix(in srgb,var(--hue) 34%,transparent);
+  transition:color var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+}
+.signature .contact:hover{color:var(--hue);border-bottom-color:var(--hue)}
 /* The understated form, used at the end of a simulator workspace. */
 .signature[data-compact="true"]{padding:14px 0 4px;gap:5px}
 .signature[data-compact="true"] .rule{display:none}
@@ -1208,7 +1343,8 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   font-size:14.5px;
   background:none;-webkit-text-fill-color:currentColor;color:var(--ink-faint);
 }
-.signature[data-compact="true"] .role{display:none}
+.signature[data-compact="true"] .role,
+.signature[data-compact="true"] .contact{display:none}
 
 /* ===========================================================================
    ONE SCREEN AT A TIME — the phone workspace.
@@ -1335,6 +1471,10 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   .panel:hover{box-shadow:var(--sh-1),var(--edge)}
   .simtile:hover{transform:none;box-shadow:var(--sh-1),var(--edge)}
   .simtile .preview{opacity:.5}
+  /* A tap on a touch screen leaves :hover stuck on the tile it left behind.
+     On a mouse that state is a preview of where you are going; here it would
+     just be a card that quietly brightened and stayed that way. */
+  .simtile:hover .tile-photo-img[data-ready="true"]{opacity:var(--photo);transform:none}
   .kpi:hover{transform:none}
   .btn:hover{transform:none}
   input[type=checkbox]{width:19px;height:19px}
@@ -1362,6 +1502,20 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
     width:150px;height:92px;right:-14px;bottom:-12px;opacity:.26;
   }
   .simtile small{display:none}
+  /* The photograph comes down a step on a phone rather than being scaled down
+     with everything else. A tile here is a third of the width it was and the
+     text sits right across the middle of the frame, so the same strength that
+     reads as atmosphere on a desktop reads as interference. The scrim comes up
+     to meet it, and the crop moves towards the middle because there is no
+     longer a text column on the left to keep clear. */
+  .simtile{--photo:.13;--photo-hi:.13}
+  .simtile .tile-photo::after{
+    background:
+      linear-gradient(101deg, var(--tile-scrim) 6%, var(--tile-scrim-soft) 58%, transparent 92%),
+      linear-gradient(0deg, var(--tile-scrim) 0%, transparent 52%),
+      radial-gradient(140% 130% at 60% 40%, transparent 30%, var(--tile-vignette) 100%);
+  }
+  .simtile .tile-photo-img{--photo-pos:50% 54%!important}
   .signature{padding:34px 0 40px}
   .legend{left:8px;bottom:6px;font-size:8.5px;gap:8px;padding:4px 8px}
   .canvas-toolbar{top:8px;right:8px;left:auto}
