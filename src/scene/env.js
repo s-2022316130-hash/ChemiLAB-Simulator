@@ -248,7 +248,7 @@ export function createEnvironment(scene, renderer, hue, { size = 330 } = {}) {
     // Atmosphere. The fog colour is the horizon colour, so distance reads as
     // depth rather than as a grey curtain drawn across the plot.
     const fogColour = rgb('--scene-fog', '#e3eaf4');
-    scene.fog = new THREE.Fog(fogColour, 72, 205);
+    scene.fog = new THREE.Fog(fogColour, 90, 265);
 
     // Lights.
     hemi.color.copy(rgb('--scene-amb-sky', '#dceafc'));

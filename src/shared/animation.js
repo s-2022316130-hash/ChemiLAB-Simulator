@@ -91,9 +91,12 @@ export const smoothstep = k => { const x = Math.min(Math.max(k, 0), 1); return x
  * slow frame oscillates, and an oscillating renderer looks far worse than a
  * consistently simpler one.
  */
-export function createQualityGovernor({ budgetMs = 13.5, headroomMs = 9.5 } = {}) {
+export function createQualityGovernor({ budgetMs = 13.5, headroomMs = 9.5, startTier = 'high' } = {}) {
   const TIERS = ['low', 'medium', 'high'];
-  let quality = 1, tierIndex = 2;
+  // Where to begin. A machine that is very unlikely to afford the top tier —
+  // a phone — starts below it rather than spending its first seconds finding
+  // that out, which is a visible drop rather than a smooth start.
+  let quality = 1, tierIndex = Math.max(0, TIERS.indexOf(startTier));
   let below = 0, above = 0, settle = 2.5, age = 0;   // seconds out of band, and since start
   let fps = null, fpsAge = 0;               // null until a real interval is seen
   // A tier that has failed twice is not tried again. Without this ratchet a

@@ -188,7 +188,8 @@ body{
   background-attachment:fixed;
   transition:background-color .3s var(--ease), color .3s var(--ease);
 }
-#app{height:100vh;display:flex;flex-direction:column}
+#app{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+body{overscroll-behavior-y:none}
 a{color:var(--accent);text-decoration:none;transition:color .18s var(--ease)}
 a:hover{color:var(--hue-deep)}
 [data-theme="dark"] a:hover{color:var(--hue-soft)}
@@ -444,12 +445,96 @@ h1,h2,h3{letter-spacing:-.02em}
 .stage{display:grid;grid-template-rows:1.12fr 1fr;gap:12px;min-height:0}
 .stage > *{min-height:0;position:relative;overflow:hidden}
 .canvas-host{position:absolute;inset:var(--panel-head) 0 0 0}
-.canvas-host canvas{display:block}
+.canvas-host canvas{display:block;width:100%!important;height:100%!important}
 .fallback{padding:var(--pad);color:var(--ink-faint);font-size:12.5px;line-height:1.55}
 @media (max-width:1280px){ .workspace{grid-template-columns:280px 1fr 320px} }
 @media (max-width:1120px){
   .workspace{grid-template-columns:1fr;grid-auto-rows:minmax(280px,auto);height:auto}
   .stage{grid-template-rows:420px 360px}
+}
+
+/* --- one screen at a time ---------------------------------------------------
+   Below the tab breakpoint the workspace stops being three columns of panels
+   and becomes four screens with a tab bar. Stacking them instead would make the
+   plant, the diagram, the controls and the results one very long scroll, and on
+   a phone that means never seeing a result while changing the input that
+   produced it. The tab bar is pinned so the run button is always one tap away.
+--------------------------------------------------------------------------- */
+.tabbar{display:none}
+@media (max-width:900px){
+  .workspace{
+    display:flex;flex-direction:column;gap:0;padding:0;height:100%;
+  }
+  .tabbar{
+    display:flex;flex:0 0 auto;gap:3px;padding:7px 8px;align-items:stretch;
+    background:var(--surface-glass);
+    -webkit-backdrop-filter:saturate(1.5) blur(12px);backdrop-filter:saturate(1.5) blur(12px);
+    border-bottom:1px solid var(--line);
+    position:sticky;top:0;z-index:8;overflow-x:auto;scrollbar-width:none;
+  }
+  .tabbar::-webkit-scrollbar{height:0}
+  .tabbar .btn.primary{padding:8px 14px;font-size:12.5px}
+  .tabbar button{
+    flex:1 1 0;min-width:0;min-height:38px;padding:8px 6px;
+    border:1px solid transparent;border-radius:10px;background:transparent;
+    color:var(--ink-faint);font-size:12px;font-weight:600;letter-spacing:.01em;
+    cursor:pointer;white-space:nowrap;transition:background .16s var(--ease), color .16s var(--ease);
+  }
+  .tabbar button[aria-selected="true"]{
+    background:var(--hue-wash);color:var(--hue-deep);
+    border-color:color-mix(in srgb,var(--hue) 26%,transparent);
+  }
+  .workspace > .pane{flex:1 1 auto;min-height:0;overflow:auto;padding:10px;display:none}
+  .workspace > .pane[data-active="true"]{display:block}
+  .workspace > .pane.grid{display:none}
+  .workspace > .pane.grid[data-active="true"]{display:grid;gap:10px;align-content:start}
+  /* The stage pane holds one view at a time and gives it the whole screen. */
+  .stage{display:none;grid-template-rows:1fr;height:100%;padding:10px;gap:0}
+  .stage[data-active="true"]{display:grid}
+  .stage > .panel{display:none}
+  .stage > .panel[data-active="true"]{display:block}
+  .home{padding:36px 18px 56px}
+}
+[data-theme="dark"] .tabbar button[aria-selected="true"]{color:var(--hue-soft)}
+
+/* Coarse pointers: everything you have to hit becomes big enough to hit, and
+   nothing important is left behind a hover state that a finger cannot produce. */
+@media (pointer:coarse){
+  .btn{min-height:38px;padding:9px 15px;touch-action:manipulation}
+  .tabbar button,.iconbtn{touch-action:manipulation}
+  .iconbtn{width:40px;height:40px}
+  .field input[type=number],.field select{min-height:42px;font-size:16px}  /* 16px stops iOS zooming on focus */
+  .field input[type=range]{height:34px}
+  .field input[type=range]::-webkit-slider-thumb{width:24px;height:24px;margin-top:-9.5px}
+  .field input[type=range]::-moz-range-thumb{width:22px;height:22px}
+  .collapsible > summary{min-height:40px;align-items:center}
+  .kv{padding:9px 7px}
+  .panel:hover{box-shadow:var(--sh-1)}
+  .simcard:hover{transform:none;box-shadow:var(--sh-1)}
+  .kpi:hover{transform:none}
+  .btn:hover{transform:none}
+  #presetbar .btn,#fsbar .btn,.canvas-toolbar .btn{min-height:32px;padding:6px 12px;font-size:11px}
+}
+
+/* Phone-sized type and spacing. Readouts get bigger rather than smaller: the
+   numbers are the point of the page. */
+@media (max-width:640px){
+  :root{--pad:12px;--shell-top:52px}
+  body{font-size:15px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .kpi .kpi-v{font-size:20px}
+  .kpi .kpi-l{font-size:11px;min-height:0;margin-bottom:4px}
+  .kv .k{font-size:13px}
+  .kv .v{font-size:14px}
+  .home h1{font-size:clamp(26px,7.5vw,34px)}
+  .home p.lede{font-size:15px}
+  .simcard{grid-template-columns:46px 1fr;gap:12px;padding:15px;row-gap:10px}
+  .simcard .pill{grid-column:2;justify-self:start}
+  .simcard .id{width:40px;height:40px;font-size:14px;border-radius:12px}
+  .legend{left:8px;bottom:6px;font-size:9px;gap:7px;padding:4px 8px}
+  .canvas-toolbar{top:8px;right:8px;left:auto;overflow-x:auto;scrollbar-width:none}
+  .canvas-toolbar .btnrow,.canvas-toolbar .perf,.canvas-toolbar .sep{display:none!important}
+  .canvas-toolbar::-webkit-scrollbar{height:0}
 }
 
 /* Toolbars over a canvas: a floating segmented strip rather than buttons
@@ -460,7 +545,8 @@ h1,h2,h3{letter-spacing:-.02em}
 /* Caption controls float over the plant rather than crowding the panel header:
    they belong to the view, and there is no room for them anywhere else. */
 .canvas-toolbar{
-  position:absolute;top:10px;right:10px;z-index:3;display:flex;align-items:center;gap:3px;
+  position:absolute;top:10px;right:10px;z-index:3;display:flex;align-items:center;gap:3px;flex-wrap:nowrap;
+
   padding:4px 5px;border-radius:99px;background:var(--surface-glass);
   -webkit-backdrop-filter:saturate(1.5) blur(12px);backdrop-filter:saturate(1.5) blur(12px);
   border:1px solid var(--line);box-shadow:var(--sh-2);
@@ -478,6 +564,7 @@ h1,h2,h3{letter-spacing:-.02em}
 [data-theme="dark"] .canvas-toolbar .btn[data-on="true"]{color:var(--hue-soft)}
 .canvas-toolbar .btn[data-on="false"]{opacity:.6}
 .canvas-toolbar .sep{width:1px;height:15px;background:var(--line);margin:0 2px;flex:0 0 auto}
+.canvas-toolbar .btnrow{flex-wrap:nowrap}
 #presetbar .btn,#fsbar .btn{
   padding:4px 10px;font-size:10.5px;border-radius:99px;font-family:var(--mono);
   letter-spacing:.04em;text-transform:uppercase;background:transparent;border-color:transparent;
@@ -583,6 +670,8 @@ h1,h2,h3{letter-spacing:-.02em}
 
 /* --- flowsheet ------------------------------------------------------------ */
 .fs-node{cursor:pointer;transition:opacity .2s var(--ease)}
+.fs-scroll{touch-action:none;cursor:grab}
+.fs-scroll:active{cursor:grabbing}
 .fs-node .fs-body{transition:stroke .25s var(--ease), filter .25s var(--ease)}
 .fs-node:hover .fs-body{filter:drop-shadow(0 0 5px currentColor)}
 .fs-node.sel .fs-body{stroke:var(--accent);stroke-width:2.6;filter:drop-shadow(0 0 7px var(--accent))}
