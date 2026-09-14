@@ -25,8 +25,11 @@ export function gradeChallenge(challenge, result) {
   // never calculated as ungraded rather than as a failure.
   const entry = result?.results?.[challenge.target.key];
   const v = entry !== null && typeof entry === 'object' ? entry.value : entry;
-  if (v === null || v === undefined || Number.isNaN(v) || typeof v !== 'number') return { graded: false, text: 'Run the simulation to be graded.' };
+  if (v === null || v === undefined || Number.isNaN(v) || typeof v !== 'number') return { graded: false, detail: 'Run the simulation to be graded.', text: 'Run the simulation to be graded.' };
   const { op, value, unit } = challenge.target;
   const pass = op === '<=' ? v <= value : op === '>=' ? v >= value : Math.abs(v - value) <= (challenge.target.tol ?? 0.05 * value);
-  return { graded: true, pass, text: `${challenge.title}: ${v.toFixed(2)} ${unit} vs target ${op} ${value} ${unit}` };
+  // `detail` is the reading on its own, for anywhere the title is already on
+  // screen; `text` keeps the title for anywhere it is not.
+  const detail = `${v.toFixed(2)} ${unit} against a target of ${op === '<=' ? 'no more than' : op === '>=' ? 'at least' : 'about'} ${value} ${unit}`;
+  return { graded: true, pass, detail, text: `${challenge.title}: ${detail}` };
 }

@@ -978,7 +978,7 @@ function diagnose(s, x, fx, notes) {
 
   if (!s.disperse?.dispersing) {
     out.push({
-      level: 'error',
+      level: 'warning',
       text: `The hydrodynamic stress in the blade zone is ${n(s.d?.stress) ? s.d.stress.toFixed(0) : '—'} Pa against a cohesive strength of ${s.disperse.strength.toFixed(0)} Pa. Nothing is being dispersed: the blade is turning the batch over without breaking a single agglomerate, and it will still be at the fineness it started at in an hour. Either thicken the mill base so it can carry stress, or turn faster.`
     });
   } else if (s.d.stress / s.disperse.strength < 1.25) {
