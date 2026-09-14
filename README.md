@@ -30,13 +30,32 @@ Routes: `#/`, `#/simulators`, `#/simulators/water-treatment`, and so on.
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
-npm run build      # static site in dist/
-npm run preview    # serve the production build
-npm run verify     # structural and behavioural checks on all five engines
+npm run dev          # http://localhost:5173
+npm run build        # static site in dist/
+npm run build:single # the same site as one self-contained .html file
+npm run preview      # serve the production build
+npm run verify       # structural and behavioural checks on all five engines
 ```
 
 Node 18 or newer.
+
+## One file, no server
+
+`npm run build:single` writes `dist/chemilab-simulator.html`: every module, all the
+CSS and all five engines inlined into a single ~1.3 MB file with nothing left to
+fetch. Double-click it and it runs — no install, no server, no network. Email it,
+put it on a USB stick, drop it in a shared folder or hand it to a class.
+
+It is a separate build rather than the normal one with the pieces glued together,
+for two reasons. The lazily loaded simulator chunks are collapsed back in, because
+the code splitting exists to keep three.js out of the first paint and with one file
+there is nothing left to defer. And the bundle is emitted as a classic script rather
+than a module, because a browser refuses to run a module script from a `file://`
+URL — which is exactly where this build is meant to be opened.
+
+The one thing it still reaches for is the Google Fonts stylesheet. Online that gives
+the intended type; offline the font stacks fall back to the system UI font and
+nothing else changes.
 
 ## What `npm run verify` checks
 
