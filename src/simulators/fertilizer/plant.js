@@ -17,7 +17,8 @@ import * as THREE from 'three';
 import {
   compressorTrain, sphereTank, column, verticalVessel, horizontalVessel, tank,
   hopperVessel, shellTubeExchanger, pipe, valve, platform, stairs, frame,
-  instrument, cabinet, statusLamp, ladder, flange, nozzle, cableTray, bollard, pipeSupport
+  instrument, cabinet, statusLamp, ladder, flange, nozzle, cableTray, bollard, pipeSupport,
+  setLampState, pulseLamps, plume
 } from '../../scene/geometry.js';
 import { MAT, STATE_COLOR } from '../../scene/materials.js';
 import { TAGS, STREAMS } from './engine.js';
@@ -306,9 +307,13 @@ export function build(view, streams) {
     // The falling curtain of prills, shown only when the engine reports product.
     const curtain = new THREE.Mesh(
       new THREE.CylinderGeometry(d.d * 0.3, d.d * 0.36, d.h - 6, 24, 1, true),
-      new THREE.MeshStandardMaterial({
-        color: PRODUCT_ON, transparent: true, opacity: 0.22, roughness: 1,
-        side: THREE.DoubleSide, depthWrite: false
+      // Front faces only and barely there: the falling prills are what the eye
+      // reads, and this is a fifty-metre transparent surface across most of the
+      // frame — easily the most expensive thing in the scene if it is not kept
+      // in its place.
+      new THREE.MeshBasicMaterial({
+        color: PRODUCT_ON, transparent: true, opacity: 0.1,
+        depthWrite: false, fog: true
       })
     );
     curtain.position.y = (d.h - 6) / 2 + 3;
@@ -319,6 +324,20 @@ export function build(view, streams) {
     g.add(withPos(platform({ w: d.d + 3, d: 2.4, y: d.h - 2, rails: true }), [0, 0, d.d / 2 + 1.2]));
     g.add(withPos(instrument({ label: 'TIT' }), [d.d / 2 + 0.4, 6, 0]));
     lamp(g, refs, TAGS.prillTower, d.h + 6);
+    // Prills falling from the spray head, and the air leaving the top of the
+    // tower on its way out. Both hang off the scene rather than the group, so
+    // neither is pickable and neither enlarges the caption box.
+    const rain = plume({
+      h: -(d.h - 7), r: d.d * 0.14, spread: d.d * 0.2, count: 260,
+      colour: 0xf4e6c6, rise: 3.4, size: .34, opacity: .95
+    });
+    rain.position.set(L[TAGS.prillTower].x, d.h - 3, L[TAGS.prillTower].z);
+    view.add(rain);
+    refs.rain = rain;
+    const vent = plume({ h: 12, r: 1.4, spread: 5, count: 90, colour: 0xe2e9f2, rise: 1.4, size: 1.9, opacity: .22 });
+    vent.position.set(L[TAGS.prillTower].x, d.h + 0.6, L[TAGS.prillTower].z);
+    view.add(vent);
+    refs.vent = vent;
     add(TAGS.prillTower, g, 'Urea prilling tower', 'column', { pos: [52, 30, 34], target: [36, 24, 0] });
   }
 
@@ -368,6 +387,14 @@ export function build(view, streams) {
     view.add(pipe(r.path, { r: r.bore, mat: r.mat ?? MAT.pipe }));
     streams?.add(id, r.path, { phase: r.phase, maxTracers: r.tracers ?? 24 });
   }
+
+  // ---- one ticker for everything that moves --------------------------------
+  // Rendering stays on the shared rAF loop; nothing here rebuilds geometry.
+  view.onTick((dt, t) => {
+    pulseLamps(refs.lamps.values(), t);
+    refs.rain?.userData.update(dt, refs.towerRate ?? 0);
+    refs.vent?.userData.update(dt, refs.towerRate ?? 0);
+  });
 
   live = refs;
   return { presets: PRESETS, refs };
@@ -476,12 +503,14 @@ export function applyState(equipment = {}, streams = []) {
   const refs = live;
   if (!refs) return;
 
+  // Lamp bodies and their halos move together, and a unit in alarm flashes —
+  // which is the one thing on a real plot that catches the eye from anywhere.
   for (const [key, l] of refs.lamps) {
     const st = equipment[key];
-    const c = stateColor(st);
-    l.material.color.setHex(c);
-    l.material.emissive.setHex(c);
-    l.material.emissiveIntensity = st ? 1.0 : 0.35;
+    setLampState(l, stateColor(st), {
+      on: !!st && st.state !== "off" && st.state !== "stopped",
+      alarm: !!st && (st.alarm === true || st.state === "tripped")
+    });
   }
   for (const [key, m] of refs.motors) {
     m.material.color.setHex(stateColor(equipment[key.split('#')[0]]));
@@ -511,6 +540,7 @@ export function applyState(equipment = {}, streams = []) {
   const towerRunning = equipment[TAGS.prillTower]?.state === 'running'
     || equipment[TAGS.prillTower]?.state === 'warning';
   if (refs.curtain) refs.curtain.visible = !!towerRunning;
+  refs.towerRate = towerRunning ? 1 : 0;
 
   for (const mesh of refs.product) {
     mesh.material.color.copy(towerRunning ? PRODUCT_ON : PRODUCT_OFF);

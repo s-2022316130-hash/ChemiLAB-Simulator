@@ -1,6 +1,27 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { MAT, STATE_COLOR } from './materials.js';
 // Reusable industrial primitives. Simulator plants compose these — never raw boxes.
+
+/** Soft radial sprite, shared by every lamp halo and every vapour plume. */
+let _halo = null;
+function haloTexture() {
+  if (_halo) return _halo;
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const c = cv.getContext('2d');
+  const grd = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(255,255,255,1)');
+  grd.addColorStop(.35, 'rgba(255,255,255,.5)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = grd; c.fillRect(0, 0, 64, 64);
+  _halo = new THREE.CanvasTexture(cv);
+  if ('colorSpace' in _halo) _halo.colorSpace = THREE.SRGBColorSpace;
+  return _halo;
+}
+
+/** Instrument dial finishes, shared so every gauge on the plot is one part. */
+const DIAL_FACE = new THREE.MeshStandardMaterial({ color: 0xf7fafc, roughness: .35, metalness: 0 });
+const DIAL_NEEDLE = new THREE.MeshStandardMaterial({ color: 0xc2340f, roughness: .5, metalness: 0 });
 const g = (geo, mat, pos = [0, 0, 0], rot = [0, 0, 0]) => {
   const m = new THREE.Mesh(geo, mat); m.position.set(...pos); m.rotation.set(...rot);
   m.castShadow = m.receiveShadow = true; return m;
@@ -103,8 +124,13 @@ export function frame({ w = 6, h = 6, d = 4 }) {
 }
 export function instrument({ label = 'PI' }) {
   const grp = new THREE.Group();
-  grp.add(g(new THREE.CylinderGeometry(.16, .16, .06, 16), MAT.instrument, [0, 0, 0], [Math.PI / 2, 0, 0]));
-  grp.add(g(new THREE.CylinderGeometry(.03, .03, .3, 8), MAT.steelDark, [0, -.18, 0]));
+  grp.add(g(new THREE.CylinderGeometry(.16, .16, .06, 20), MAT.instrument, [0, 0, 0], [Math.PI / 2, 0, 0]));
+  // Dial face and needle. A gauge with a face on it reads as an instrument at
+  // two metres; a blank disc reads as a washer.
+  grp.add(g(new THREE.CircleGeometry(.125, 20), DIAL_FACE, [0, 0, .032]));
+  grp.add(g(new THREE.BoxGeometry(.012, .09, .004), DIAL_NEEDLE, [0, .03, .036], [0, 0, .5]));
+  grp.add(g(new THREE.CylinderGeometry(.035, .035, .07, 12), MAT.steelDark, [0, -.14, 0]));
+  grp.add(g(new THREE.CylinderGeometry(.025, .025, .26, 8), MAT.steelDark, [0, -.28, 0]));
   grp.userData.label = label;
   return grp;
 }
@@ -168,11 +194,104 @@ export function mediaBed({ w = 3, l = 3, h = 1.1, mat = MAT.steelDark }) {
  * Equipment status lamp. Carries its own material so colouring one never
  * colours every other item sharing a palette entry.
  */
-export function statusLamp({ r = .17 } = {}) {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), new THREE.MeshStandardMaterial({
-    color: STATE_COLOR.idle, emissive: STATE_COLOR.idle, emissiveIntensity: .9, roughness: .4
+export function statusLamp({ r = .18 } = {}) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), new THREE.MeshStandardMaterial({
+    color: STATE_COLOR.idle, emissive: STATE_COLOR.idle, emissiveIntensity: 1.6, roughness: .28,
+    toneMapped: false
   }));
-  m.name = 'lamp'; m.castShadow = false; return m;
+  m.name = 'lamp'; m.castShadow = false;
+  m.userData.radius = r;
+  // An additive halo around the bulb. A lamp on a real plant is visible across
+  // the plot because it glows, not because the bulb is a slightly brighter
+  // shade of its housing.
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: haloTexture(), color: STATE_COLOR.idle, transparent: true,
+    blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false, opacity: .7
+  }));
+  halo.scale.setScalar(r * 7);
+  halo.name = 'halo';
+  m.add(halo);
+  m.userData.halo = halo;
+  m.userData.base = 0.7;
+  return m;
+}
+
+/**
+ * Set a lamp to an equipment-state colour. Body and halo move together, and a
+ * state the engine has not reported is dim rather than dark — a dark lamp means
+ * the unit is stopped, which is not the same as nothing having been said yet.
+ */
+export function setLampState(lamp, colour, { on = true, alarm = false } = {}) {
+  if (!lamp?.material) return;
+  lamp.material.color.setHex(colour);
+  lamp.material.emissive.setHex(colour);
+  lamp.material.emissiveIntensity = on ? 1.9 : 0.5;
+  lamp.userData.alarm = !!alarm;
+  lamp.userData.base = on ? 0.8 : 0.25;
+  const halo = lamp.userData.halo;
+  if (halo) { halo.material.color.setHex(colour); halo.material.opacity = lamp.userData.base; }
+}
+
+/**
+ * Flash the lamps that are in alarm. One call per frame from a plant's ticker
+ * drives every lamp that plant owns; lamps not in alarm hold steady, so a
+ * flashing light on the plot always means something.
+ */
+export function pulseLamps(lamps, t) {
+  for (const lamp of lamps) {
+    const halo = lamp?.userData?.halo;
+    if (!halo) continue;
+    const base = lamp.userData.base ?? 0.7;
+    const r = lamp.userData.radius ?? 0.18;
+    if (lamp.userData.alarm) {
+      const k = 0.5 + 0.5 * Math.sin(t * 6.5);
+      halo.material.opacity = base * (0.35 + 0.9 * k);
+      lamp.material.emissiveIntensity = 1.1 + 1.6 * k;
+      halo.scale.setScalar(r * (6 + 2.4 * k));
+    } else if (Math.abs(halo.material.opacity - base) > 1e-3) {
+      halo.material.opacity = base;
+      halo.scale.setScalar(r * 7);
+    }
+  }
+}
+
+/**
+ * Rising vapour above a stack or a vent. Particles are recycled rather than
+ * allocated, and the column only moves when it is given a rate — an idle stack
+ * shows nothing, which is the same rule the stream tracers follow.
+ */
+export function plume({ h = 9, r = .55, spread = 2.2, count = 110, colour = 0xffffff, rise = 1.5, size = 1, opacity = .36 }) {
+  const pos = new Float32Array(count * 3);
+  const life = new Float32Array(count);
+  for (let i = 0; i < count; i++) life[i] = Math.random();
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+    color: colour, size, transparent: true, opacity: 0, depthWrite: false,
+    sizeAttenuation: true, map: haloTexture(), fog: true
+  }));
+  pts.frustumCulled = false;
+  pts.visible = false;
+
+  /** rate: 0…1, taken from what the engine reported for the stream. */
+  pts.userData.update = (dt, rate) => {
+    const k = Math.min(Math.max(rate || 0, 0), 1);
+    pts.material.opacity += (k * opacity - pts.material.opacity) * Math.min(dt * 2.5, 1);
+    pts.visible = pts.material.opacity > 0.004;
+    if (!pts.visible) return;
+    for (let i = 0; i < count; i++) {
+      life[i] += dt * rise * (0.35 + 0.65 * k) * 0.16;
+      if (life[i] > 1) life[i] -= 1;
+      const u = life[i];
+      const width = r + spread * u;
+      pos[i * 3] = (Math.sin(u * 9 + i) * 0.5 + Math.cos(u * 6 + i * 1.7) * 0.5) * width * 0.5;
+      pos[i * 3 + 1] = u * h;
+      pos[i * 3 + 2] = Math.cos(u * 7 + i * 2.3) * width * 0.5;
+    }
+    geo.attributes.position.needsUpdate = true;
+    pts.material.size = size * (0.5 + 0.9 * k);
+  };
+  return pts;
 }
 /**
  * Inclined rotating drum on trunnion piers: rotary dryers, kilns, coolers,
@@ -344,10 +463,75 @@ export function sphereTank({ d = 6, legs = 6, mat = MAT.vessel }) {
   }
   return grp;
 }
-export function ground({ size = 60 }) {
-  // Slightly lighter and less saturated than the structures standing on it, so
-  // equipment reads against the ground instead of merging into it.
-  const mat = new THREE.MeshStandardMaterial({ color: 0x2b2535, roughness: 1, metalness: 0 });
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
-  m.rotation.x = -Math.PI / 2; m.receiveShadow = true; return m;
+
+/**
+ * Fuse the static meshes of a built assembly, one merged mesh per material.
+ *
+ * A plant composed honestly out of these primitives ends up with several
+ * hundred small meshes — a staircase alone is one mesh per tread — and on an
+ * integrated GPU it is the number of draw calls, not the number of triangles,
+ * that decides whether the view holds 60 fps. Merging costs nothing visually:
+ * the same geometry is submitted in one call instead of thirty.
+ *
+ * Three things are deliberately left alone, because something else depends on
+ * being able to find or move them:
+ *
+ *  - any mesh with a name — 'liquid', 'media', 'motor', 'lamp', 'flame' — which
+ *    is how a plant module reaches the parts it drives from engine results;
+ *  - any named group, such as 'rotor' or 'shell', which is compacted within
+ *    itself so it can still turn as one piece;
+ *  - anything whose material is unique to it, since a plant that cloned a
+ *    material did so in order to colour that one item on its own.
+ */
+export function compact(root) {
+  if (!root?.isObject3D) return root;
+  root.updateMatrixWorld(true);
+  const scopes = [root];
+  root.traverse(o => { if (o !== root && o.isGroup && o.name) scopes.push(o); });
+  for (const scope of scopes) compactScope(scope);
+  return root;
+}
+
+const mergeable = o =>
+  o.isMesh && !o.isInstancedMesh && !o.isSkinnedMesh && !o.name &&
+  !o.userData.noMerge && o.geometry?.attributes?.position && o.material && !Array.isArray(o.material);
+
+function compactScope(scope) {
+  const inv = new THREE.Matrix4().copy(scope.matrixWorld).invert();
+  const buckets = new Map();
+  (function walk(node) {
+    for (const child of node.children) {
+      // A named group is its own scope and is compacted on its own pass.
+      if (child.isGroup && child.name) continue;
+      if (mergeable(child)) {
+        const key = child.material.uuid;
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(child);
+      }
+      if (child.children?.length) walk(child);
+    }
+  })(scope);
+
+  for (const parts of buckets.values()) {
+    if (parts.length < 2) continue;
+    const geos = [];
+    let ok = true;
+    for (const m of parts) {
+      const g2 = m.geometry.clone();
+      g2.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld));
+      // Merging needs one attribute set across the batch; anything else is
+      // left as it was rather than silently dropped from the scene.
+      if (!g2.index || !g2.attributes.normal || !g2.attributes.uv) { ok = false; break; }
+      geos.push(g2);
+    }
+    if (!ok) continue;
+    let merged = null;
+    try { merged = mergeGeometries(geos, false); } catch { merged = null; }
+    if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, parts[0].material);
+    mesh.castShadow = parts.some(m => m.castShadow);
+    mesh.receiveShadow = parts.some(m => m.receiveShadow);
+    for (const m of parts) m.parent?.remove(m);
+    scope.add(mesh);
+  }
 }

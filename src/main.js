@@ -1,7 +1,12 @@
+import { initTheme } from './shared/theme.js';
 import { createShell } from './app/shell.js';
 import { createRouter } from './app/router.js';
 import { homePage, simulatorsPage, simulatorPage } from './app/pages.js';
 import { getSimulator } from './app/registry.js';
+
+// Theme first: the 3D renderer reads the design tokens the moment it is built,
+// so the palette has to be settled before anything mounts.
+initTheme();
 
 const shell = createShell(document.getElementById('app'));
 const router = createRouter({

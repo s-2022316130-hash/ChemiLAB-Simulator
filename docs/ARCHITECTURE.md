@@ -5,11 +5,11 @@
 | Layer | Owns | Must not |
 |---|---|---|
 | `simulation/` | physics, balances, solver, status, scenarios | touch the DOM or three.js |
-| `scene/` | 3D geometry, picking, camera, tracers | compute process values |
+| `scene/` | 3D geometry, picking, camera, lighting, tracers | compute process values |
 | `flowsheet/` | SVG symbols, PFD, labels | compute process values |
 | `information/` | equipment text, equations, tour, assumptions | hold state |
 | `ui/` | panels, controls, results, cases | derive numbers |
-| `shared/` | units, format, store, validation, persistence, animation | know about any single process |
+| `shared/` | units, format, store, validation, persistence, animation, theme | know about any single process |
 
 ## Engine contract (`src/simulation/contract.js`)
 
@@ -57,8 +57,52 @@ When status is not COMPLETE or WARNING, the flowsheet is cleared and tracers sto
 to the status lifecycle and discards superseded runs with a token counter, so a slow run
 can never overwrite a newer one.
 
+## Colour
+
+`shared/theme.css` holds every colour in the application as a semantic token, and
+`shared/theme.js` is the only way anything outside CSS reads one. Nothing else names a
+hex. Three consequences:
+
+- **Light and dark are one design.** `data-theme` on `<html>` swaps the token values;
+  every component follows without knowing a theme exists. The choice is remembered per
+  browser and applied before first paint by an inline script in `index.html`.
+- **The plant is lit by the same palette as the interface.** The `--scene-*` tokens —
+  sky, ground, fog, light intensities, exposure, bloom strength — are read by
+  `scene/env.js` at build and again on every theme change.
+- **A stream phase is one colour everywhere.** `--stream-*` is read by the flowsheet in
+  CSS and by `scene/streams.js` through `token()`, so the plant and the diagram cannot
+  drift apart.
+
+`data-sim` carries each simulator's signature hue, which tints the accent, the rails,
+the rim light and the sky. It is set before the workspace mounts, because the renderer
+reads it at construction.
+
 ## Performance
 
-One `requestAnimationFrame` loop for the whole app (`shared/animation.js`). Stream tracers
-are `InstancedMesh`; a quality governor lowers tracer count when frame rate drops.
-`webglAvailable()` gates the 3D view and the workspace falls back to the flowsheet alone.
+One `requestAnimationFrame` loop for the whole app (`shared/animation.js`), which
+measures two separate things: how long a frame's work took, and how long the browser
+waited before asking for the next one. Only the first is a statement about the renderer —
+a throttled or occluded tab is handed frames slowly while each one is cheap — so quality
+decisions are made on work time and the frame rate is reported only when it is real.
+
+`createQualityGovernor` publishes a continuous `quality` (tracer density) and a
+`tier`, and `scene/renderer.js` maps the tier onto multisampling, render scale, shadow
+resolution and the bloom pass. Demotions in the first seconds do not count, and a tier
+that has failed twice is not tried again, so nothing visibly oscillates.
+
+What keeps the frame cheap:
+
+- **`compact()` in `scene/geometry.js`** fuses the static meshes of each assembly, one
+  merged mesh per material, as it enters the scene. A plant composed honestly out of
+  primitives arrives as several hundred small meshes — a staircase is one per tread — and
+  draw calls, not triangles, are what an integrated GPU runs out of. Named meshes and
+  named groups are left alone: that is how a plant module reaches the parts it drives.
+- **Shadows are static**, re-rendered on demand and a few times a second at full quality.
+  The sun does not move and neither does most of the plant.
+- **Captions are their own scene**, composited after post-processing. Text stays crisp,
+  never picks up bloom, and compositing it does not mean walking the plant twice.
+- **Transparency is rationed.** It was half the frame budget on the reference machine
+  until liquid bodies stopped being double-sided.
+
+Stream tracers are `InstancedMesh`. `webglAvailable()` gates the 3D view and the
+workspace falls back to the flowsheet alone.

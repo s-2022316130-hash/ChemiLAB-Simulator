@@ -16,7 +16,8 @@ import * as THREE from 'three';
 import {
   rotaryDrum, cyclone, hopperVessel, screwConveyor, tank, horizontalVessel,
   blower, pipe, valve, platform, stairs, frame, instrument, cabinet, statusLamp,
-  ladder, flange, nozzle, cableTray, bollard, pipeSupport
+  ladder, flange, nozzle, cableTray, bollard, pipeSupport,
+  setLampState, pulseLamps, plume
 } from '../../scene/geometry.js';
 import { MAT, STATE_COLOR } from '../../scene/materials.js';
 import { TAGS, STREAMS } from './engine.js';
@@ -272,6 +273,12 @@ export function build(view, streams) {
     g.add(frame({ w: 2.4, h: 1.2, d: 2.4 }));
     g.add(withPos(ladder({ h: d.h - 1.5 }), [d.d / 2 + 0.25, 0, 0]));
     lamp(g, refs, TAGS.stack, d.h + 1.2);
+    // Vapour leaving the stack. Added to the scene rather than to the group so
+    // it is neither pickable nor counted into the caption box.
+    const vent = plume({ h: 13, r: .6, spread: 4.4, count: 130, colour: 0xdde4ee, rise: 1.9, size: 1.6, opacity: .3 });
+    vent.position.set(L[TAGS.stack].x, d.h + 0.5, L[TAGS.stack].z);
+    view.add(vent);
+    refs.plume = vent;
     add(TAGS.stack, g, 'Exhaust stack', 'column', { pos: [33, 12, 13], target: [28.5, 7, 7.5] });
   }
 
@@ -343,8 +350,16 @@ export function build(view, streams) {
 
   // ---- one ticker for every turning part ------------------------------------
   // Rendering stays on the shared rAF loop; nothing here rebuilds geometry.
-  view.onTick(dt => {
+  view.onTick((dt, t) => {
     for (const r of refs.rotors) if (r.speed > 0 && r.obj) r.obj.rotation.x += dt * r.speed;
+    pulseLamps(refs.lamps.values(), t);
+    // A burner that is alight moves. The flicker is cosmetic; how bright the
+    // flame is set in applyState, from the duty the engine reported.
+    if (refs.flame?.visible) {
+      const f = 0.92 + 0.11 * Math.sin(t * 21) + 0.06 * Math.sin(t * 37.4);
+      refs.flame.scale.set(f, 1 + (f - 1) * 2.4, f);
+    }
+    refs.plume?.userData.update(dt, refs.plumeRate ?? 0);
   });
 
   live = refs;
@@ -442,12 +457,14 @@ export function applyState(equipment = {}, streams = []) {
   const refs = live;
   if (!refs) return;
 
+  // Lamp bodies and their halos move together, and a unit in alarm flashes —
+  // which is the one thing on a real plot that catches the eye from anywhere.
   for (const [key, l] of refs.lamps) {
     const st = equipment[key];
-    const c = stateColor(st);
-    l.material.color.setHex(c);
-    l.material.emissive.setHex(c);
-    l.material.emissiveIntensity = st ? 1.0 : 0.35;
+    setLampState(l, stateColor(st), {
+      on: !!st && st.state !== "off" && st.state !== "stopped",
+      alarm: !!st && (st.alarm === true || st.state === "tripped")
+    });
   }
 
   for (const [key, m] of refs.motors) {
@@ -469,6 +486,10 @@ export function applyState(equipment = {}, streams = []) {
     if (!Number.isFinite(duty)) mesh.material.color.copy(SHELL_COLD);
     else mesh.material.color.copy(SHELL_COLD).lerp(SHELL_HOT, Math.min(Math.max(duty, 0), 1));
   }
+  // The stack only shows a plume when the engine says something is leaving it.
+  const stack = streams.find(x => x.id === STREAMS.stackGas);
+  refs.plumeRate = Number.isFinite(stack?.flow) && stack.flow > 0 ? 1 : 0;
+
   if (refs.flame) {
     const firing = Number.isFinite(duty) && duty > 0;
     refs.flame.visible = firing;

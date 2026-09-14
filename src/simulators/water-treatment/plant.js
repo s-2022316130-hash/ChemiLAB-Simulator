@@ -16,7 +16,7 @@ import * as THREE from 'three';
 import {
   basin, tank, agitator, mediaBed, centrifugalPump, blower, pipe, valve,
   platform, stairs, frame, instrument, cabinet, statusLamp, verticalVessel,
-  ladder, flange, nozzle, cableTray, bollard, pipeSupport
+  ladder, flange, nozzle, cableTray, bollard, pipeSupport, setLampState, pulseLamps
 } from '../../scene/geometry.js';
 import { MAT, STATE_COLOR } from '../../scene/materials.js';
 import { TAGS, STREAMS } from './engine.js';
@@ -446,8 +446,9 @@ export function build(view, streams) {
 
   // ---- one ticker for every turning part ----------------------------------
   // Rendering stays on the shared rAF loop; nothing here rebuilds geometry.
-  view.onTick(dt => {
+  view.onTick((dt, t) => {
     for (const r of refs.rotors) if (r.speed > 0 && r.obj) r.obj.rotation.y += dt * r.speed;
+    pulseLamps(refs.lamps.values(), t);
   });
 
   live = refs;
@@ -545,12 +546,14 @@ export function applyState(equipment = {}, streams = []) {
   const refs = live;
   if (!refs) return;
 
+  // Lamp bodies and their halos move together, and a unit in alarm flashes —
+  // which is the one thing on a real plot that catches the eye from anywhere.
   for (const [key, l] of refs.lamps) {
     const st = equipment[key];
-    const c = stateColor(st);
-    l.material.color.setHex(c);
-    l.material.emissive.setHex(c);
-    l.material.emissiveIntensity = st ? 1.0 : 0.35;
+    setLampState(l, stateColor(st), {
+      on: !!st && st.state !== "off" && st.state !== "stopped",
+      alarm: !!st && (st.alarm === true || st.state === "tripped")
+    });
   }
 
   for (const [key, m] of refs.motors) {
