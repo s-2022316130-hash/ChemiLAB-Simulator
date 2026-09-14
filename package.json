@@ -17,7 +17,8 @@
     "build": "vite build",
     "build:single": "vite build && node scripts/build-single-file.mjs",
     "preview": "vite preview --port 4173",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "backdrops": "node scripts/capture-backdrops.mjs"
   },
   "dependencies": {
     "three": "^0.169.0"

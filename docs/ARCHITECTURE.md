@@ -116,6 +116,40 @@ and the sky. It is set before the workspace mounts, because the renderer reads i
 construction. Entering a simulator is meant to feel like entering a different facility
 while the system around it stays identical.
 
+The one exception is the mark in the masthead. `assets/chemilab-logo.svg` carries its
+own fixed plate and its own two colours and takes no token at all: the hairline under
+the bar already says which plant you are standing in, and a brand that restates it is a
+brand that moves.
+
+## Gallery photography
+
+Library tiles are backed by a still of the plant they open — a render of the actual
+three.js scene, produced offline by `npm run backdrops` and committed to
+`assets/plant-bg/`. `scene/renderer.js` exposes `capture()` for it; nothing in the
+running application calls that.
+
+Three things about it are worth knowing before changing any of them.
+
+- **The camera aims at a cluster, not the plot.** `frameBox()` solves a distance by
+  fitting every corner of a bounding box, and at the fifteen-degree elevation these
+  shots use, the corner that binds is the far one — most of the answer is the *depth*
+  of the site rather than its size. Raising `fill` barely moves the camera because the
+  distance asymptotes to however deep the plot is. Aiming at a handful of tags instead
+  puts the camera among the vessels and lets the rest of the plant recede behind it.
+- **The layer stack is stated, not implied.** Photograph, resting scrim, hover scrim,
+  hue atmosphere, vignette, content. A `::before` is an element's *first* child and
+  would otherwise sit under the image, so `theme.css` gives the three photo layers
+  explicit z-indexes.
+- **The right file is chosen in script, not by `srcset`.** The one-file build inlines
+  these as `data:` URIs, and a data URI cannot appear in a `srcset` — the comma after
+  `;base64` is that attribute's own separator. `app/backdrops.js` picks once, up front,
+  which also means a phone never begins fetching the 1600-wide file.
+
+Both themes carry the same files and treat them oppositely: a night render laid on a
+dark card has no separation and is lifted, and the same render laid on a white card is
+a grey cloud and is left alone under a much lighter scrim. The numbers are in
+`tokens.css` under `--photo`.
+
 ## Layout
 
 Three column widths, one component language:

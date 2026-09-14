@@ -168,6 +168,16 @@
   --veil-a:color-mix(in srgb, var(--hue) 14%, transparent);
   --veil-b:color-mix(in srgb, #3f6fd8 9%, transparent);
 
+  /* Gallery photography. Each library tile carries a wide still of the plant it
+     opens; these say how present it is allowed to be and what keeps the text
+     readable over it. At a fifth of its strength the picture reads as material
+     the card is made of; much past a third it becomes a photograph with writing
+     on it, which is a different and much worse card. */
+  --photo:.2; --photo-hi:.34;
+  --tile-scrim:rgba(9,13,21,.9);
+  --tile-scrim-soft:rgba(9,13,21,.44);
+  --tile-vignette:rgba(3,6,11,.42);
+
   --ease:cubic-bezier(.22,.61,.36,1);
   --ease-out:cubic-bezier(.16,1,.3,1);
   --ease-in-out:cubic-bezier(.65,0,.35,1);
@@ -269,6 +279,15 @@
   --grid-line:rgba(40,70,110,.055);
   --veil-a:color-mix(in srgb, var(--hue) 10%, transparent);
   --veil-b:color-mix(in srgb, #3f6fd8 7%, transparent);
+
+  /* On paper the same photograph is far louder, and what protects the text is a
+     bright scrim rather than a dark one — the dark theme's values applied here
+     would put a grey cloud on a white card. The vignette is cool grey and
+     barely there: a black vignette on paper reads as a printing fault. */
+  --photo:.22; --photo-hi:.36;
+  --tile-scrim:rgba(248,251,254,.86);
+  --tile-scrim-soft:rgba(248,251,254,.42);
+  --tile-vignette:rgba(126,152,182,.26);
 }
 
 /* ===========================================================================

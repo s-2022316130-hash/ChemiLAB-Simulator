@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ChemiLAB — backdrop capture</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- The scene reads its lighting, sky and exposure from the design tokens, so
+     the theme has to be decided before anything is constructed. -->
+<script>document.documentElement.dataset.theme = new URL(location.href).searchParams.get('theme') === 'light' ? 'light' : 'dark';</script>
+<link rel="stylesheet" href="../src/shared/theme.css" />
+<style>
+  body{margin:0;padding:18px;background:var(--bg);color:var(--ink);font:13px/1.5 var(--sans,system-ui)}
+  h1{font-size:15px;margin:0 0 4px}
+  p{margin:0 0 14px;color:var(--ink-faint)}
+  #stage{width:1600px;height:700px;position:fixed;left:-4000px;top:0}
+  #log{font-family:var(--mono,monospace);font-size:12px;white-space:pre-wrap;line-height:1.7}
+  .shots{display:grid;grid-template-columns:1fr;gap:10px;margin-top:16px;max-width:900px}
+  .shots img{width:100%;border-radius:8px;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<h1>Backdrop capture</h1>
+<p>Renders each plant as a still and writes it to <code>assets/plant-bg/</code>. Development only.</p>
+<div id="log">starting…</div>
+<div class="shots" id="shots"></div>
+<div id="stage"></div>
+<script type="module" src="./backdrops.js"></script>
+</body>
+</html>

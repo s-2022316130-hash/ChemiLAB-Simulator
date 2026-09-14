@@ -35,6 +35,7 @@ npm run build        # static site in dist/
 npm run build:single # the same site as one self-contained .html file
 npm run preview      # serve the production build
 npm run verify       # structural and behavioural checks on all five engines
+npm run backdrops    # re-photograph the five plants for the gallery tiles
 ```
 
 Node 18 or newer.
@@ -42,9 +43,10 @@ Node 18 or newer.
 ## One file, no server
 
 `npm run build:single` writes `dist/chemilab-simulator.html`: every module, all the
-CSS and all five engines inlined into a single ~1.3 MB file with nothing left to
-fetch. Double-click it and it runs — no install, no server, no network. Email it,
-put it on a USB stick, drop it in a shared folder or hand it to a class.
+CSS, all five engines and the gallery photography inlined into a single ~2 MB file
+with nothing left to fetch. Double-click it and it runs — no install, no server, no
+network. Email it, put it on a USB stick, drop it in a shared folder or hand it to a
+class.
 
 It is a separate build rather than the normal one with the pieces glued together,
 for two reasons. The lazily loaded simulator chunks are collapsed back in, because
@@ -56,6 +58,28 @@ URL — which is exactly where this build is meant to be opened.
 The one thing it still reaches for is the Google Fonts stylesheet. Online that gives
 the intended type; offline the font stacks fall back to the system UI font and
 nothing else changes.
+
+## Where the photographs come from
+
+Each tile in the library carries a wide industrial still behind its text. None of it
+is stock photography: every one is a render of the plant that tile opens, taken by
+`npm run backdrops` through the same three.js scene, reflection probe and tone mapping
+the simulator itself uses.
+
+That began as a licensing decision — an image of somebody else's refinery carries an
+obligation, and one that is only ever going to be shown at a fifth of its strength
+behind a heading is a poor thing to take an obligation for. It turned out to be the
+better picture anyway. The vessels behind *Water Treatment Plant* are that plant's
+vessels, and a plant that gets rebuilt is re-photographed by running the command
+again rather than drifting quietly away from a photograph nobody can update.
+
+The shots are composed low — around fifteen degrees, among the vessels rather than
+above them — and deliberately do not fit the whole plot in frame. `tools/backdrops.js`
+says why, and holds the five camera specifications.
+
+The mark in the masthead is `assets/chemilab-logo.svg`, inlined at build time so the
+same artwork is the logo and the favicon. It is the one element on the page that does
+not take the active simulator's colour.
 
 ## What `npm run verify` checks
 

@@ -51,6 +51,12 @@ await build({
     target: 'es2020',
     assetsDir: '.',
     cssCodeSplit: false,
+    // Every asset becomes a data: URI rather than a file next to the bundle —
+    // which is the whole point here, and is why the gallery backdrops survive
+    // into a file opened from a USB stick with no network. It is also why this
+    // build is about half a megabyte larger than the split one: base64 costs a
+    // third on top of the bytes it carries.
+    assetsInlineLimit: 12 * 1024 * 1024,
     modulePreload: { polyfill: false },
     reportCompressedSize: false,
     // One deliberate chunk. The warning is about the thing being asked for.

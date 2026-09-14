@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-labelledby="cl-logo-title">
+<title id="cl-logo-title">ChemiLAB</title>
+<!--
+  ChemiLAB mark.
+
+  A hexagonal ring opened on one side, with a process line leaving it and
+  turning down to a battery limit. Three things are meant to be read at once,
+  and which one you see first does not matter:
+
+    · the ring is a molecule, the one glyph chemistry owns outright — and not a
+      flask or an orbiting atom, both of which belong to school science rather
+      than to process engineering;
+    · drawn as mitred pipe, it is a process loop with a product stream taken off
+      it and run down to a battery limit;
+    · the open ring is a C and the take-off is an L.
+
+  It is two paths, which is what survives at 24 px. The plate is
+  a fixed graphite so the mark never changes colour: the accent under the
+  masthead already says which plant you are in, and a brand that restates that
+  is a brand that moves. Same mark, same colours, every simulator, both themes.
+-->
+<defs>
+  <linearGradient id="cl-plate" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#28374d"/>
+    <stop offset="0.55" stop-color="#16202f"/>
+    <stop offset="1" stop-color="#0d141f"/>
+  </linearGradient>
+</defs>
+<rect x="0" y="0" width="32" height="32" rx="8.5" fill="url(#cl-plate)"/>
+<rect x="0.5" y="0.5" width="31" height="31" rx="8" fill="none" stroke="#ffffff" stroke-opacity="0.13"/>
+<!-- Mitred, not rounded. Rounded joins at this weight close the hexagon up into
+     a plain letter C and the ring stops reading as a ring. -->
+<g fill="none" stroke-linecap="square" stroke-linejoin="miter" stroke-miterlimit="6" stroke-width="2.3">
+  <!-- the ring, open to the right -->
+  <path d="M18.1 9.25 10.3 9.25 6.4 16 10.3 22.75 18.1 22.75" stroke="#e9f1fc"/>
+  <!-- the stream taken off it: out, down, away -->
+  <path d="M15.4 16 H22.9 V24.3 H26.3" stroke="#57cfe4"/>
+</g>
+</svg>
