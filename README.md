@@ -156,7 +156,18 @@ be used for plant design.
 2. Push to `main`, or run the **Deploy to GitHub Pages** workflow manually.
 
 The build uses relative asset paths, so it works at `https://<user>.github.io/<repo>/`
-without extra configuration.
+without extra configuration — and, for the same reason, from any other static host.
+
+## Publishing on Vercel
+
+Vercel detects Vite and needs no build configuration. `vercel.json` exists for one
+reason: Vercel's default for a static output is `Cache-Control: public, max-age=0,
+must-revalidate` on *everything*, and Vite's asset filenames already carry a content
+hash. Revalidating ten immutable chunks on every visit is a round trip per chunk for a
+file that cannot have changed, so `/assets/*` is marked immutable for a year.
+
+`index.html` deliberately keeps the default. It is the one file whose name does not
+change between deploys, so it is the one file that has to be revalidated.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/SIMULATOR-01.md`](docs/SIMULATOR-01.md)
 and [`CLAUDE.md`](CLAUDE.md).
