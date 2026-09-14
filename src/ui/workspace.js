@@ -42,10 +42,52 @@ export function mountWorkspace(root, sim) {
 
   const infoHost = el('div');
   const tourHost = el('div', { class: 'body' });
-  const left = el('div', { class: 'grid' });
-  const rail = el('div', { class: 'grid' });
+  const left = el('div', { class: 'grid pane' });
+  const rail = el('div', { class: 'grid pane' });
   const stage = el('div', { class: 'stage' }, [plant3d, fsPanel]);
-  clear(root).appendChild(el('div', { class: 'workspace' }, [left, stage, rail]));
+
+  // ---- one screen at a time on a phone ---------------------------------
+  // Below the tab breakpoint the three columns become four screens. Which one
+  // is showing is a CSS decision driven by these attributes, so the desktop
+  // layout is untouched and nothing has to be rebuilt when the window changes.
+  const TABS = [
+    { id: 'plant', label: 'Plant', panes: [stage, plant3d] },
+    { id: 'diagram', label: 'Diagram', panes: [stage, fsPanel] },
+    { id: 'controls', label: 'Controls', panes: [left] },
+    { id: 'results', label: 'Results', panes: [rail] }
+  ];
+  const tabbar = el('div', { class: 'tabbar', role: 'tablist' });
+  const tabButtons = new Map();
+  function showTab(id) {
+    for (const t of TABS) {
+      const on = t.id === id;
+      tabButtons.get(t.id)?.setAttribute('aria-selected', String(on));
+    }
+    // A pane is active if any showing tab wants it, so the stage stays up while
+    // its two panels take turns inside it.
+    const wanted = new Set(TABS.find(t => t.id === id)?.panes || []);
+    for (const node of [stage, plant3d, fsPanel, left, rail]) {
+      node.dataset.active = String(wanted.has(node));
+    }
+  }
+  for (const t of TABS) {
+    const b = el('button', { role: 'tab', text: t.label, onClick: () => showTab(t.id) });
+    tabButtons.set(t.id, b);
+    tabbar.appendChild(b);
+  }
+  // The run button is pinned to the bar: on a phone the controls and the
+  // results are different screens, and having to go back to one to start the
+  // other is the whole reason tabbed layouts get a bad name.
+  tabbar.append(
+    el('span', { style: 'flex:0 0 1px;align-self:stretch;background:var(--line);margin:0 4px' }),
+    el('button', {
+      class: 'btn primary', style: 'flex:0 0 auto;min-width:0',
+      text: 'Run', title: 'Run the simulation', onClick: () => runtime.run()
+    })
+  );
+  showTab('plant');
+
+  clear(root).appendChild(el('div', { class: 'workspace' }, [tabbar, left, stage, rail]));
 
   /** A button that shows whether it is on rather than needing a click to find out. */
   function toggleBtn(label, initial, onChange, title) {
@@ -75,7 +117,7 @@ export function mountWorkspace(root, sim) {
     // Open on the overview rather than on whatever the camera was initialised
     // to, so the first thing seen is the whole plant.
     const start = built.presets?.overview;
-    if (start) { view.camera.position.set(...start.pos); view.controls.target.set(...start.target); }
+    if (start) view.jumpTo(start.pos, start.target);
 
     // The caption controls float over the plant: they belong to the view, and
     // a panel header already carrying seven camera presets has no room for them.
@@ -86,10 +128,11 @@ export function mountWorkspace(root, sim) {
     // it, so how much they say belongs to whoever is looking. One switch turns
     // them off outright; the three beside it choose what a caption carries.
     const detail = el('span', { class: 'btnrow', style: 'gap:3px' });
-    let remembered = { ...CAPTION_DEFAULT };
+    const initial = view.captions;
+    let remembered = { ...initial };
     const anyOn = f => CAPTION_FIELDS.some(k => f[k]);
 
-    const capBtn = toggleBtn('Captions', anyOn(CAPTION_DEFAULT), on => {
+    const capBtn = toggleBtn('Captions', anyOn(initial), on => {
       if (on) {
         const restore = anyOn(remembered) ? remembered : { ...CAPTION_DEFAULT };
         view.setCaptions(restore);
@@ -102,7 +145,7 @@ export function mountWorkspace(root, sim) {
     }, 'Show or hide every equipment caption in the 3D plant');
 
     for (const key of CAPTION_FIELDS) {
-      detail.appendChild(toggleBtn(CAPTION_LABEL[key], !!CAPTION_DEFAULT[key], on => {
+      detail.appendChild(toggleBtn(CAPTION_LABEL[key], !!initial[key], on => {
         const next = view.setCaptions({ [key]: on });
         // Turning the last one off is the same decision as switching captions
         // off, so the master switch follows rather than contradicting it.
@@ -147,6 +190,14 @@ export function mountWorkspace(root, sim) {
     add('tags', 'Tags', 'Show equipment tags on the diagram');
     add('names', 'Names', 'Show equipment names on the diagram');
     add('streams', 'Stream values', 'Show the calculated flow on each stream');
+    // The diagram pans and zooms, which is the only way it is readable in a
+    // phone-width column. These are the same gestures with a button on them.
+    fsbar.append(
+      el('span', { class: 'sep' }),
+      el('button', { class: 'btn', text: '−', title: 'Zoom out', onClick: () => flowsheet.zoom(1 / 1.3) }),
+      el('button', { class: 'btn', text: 'Fit', title: 'Fit the whole diagram', onClick: () => flowsheet.fit() }),
+      el('button', { class: 'btn', text: '+', title: 'Zoom in', onClick: () => flowsheet.zoom(1.3) })
+    );
 
     // Phase legend: which colour means which kind of material. Built from the
     // phases this flowsheet actually uses, so it never lists one that is absent.

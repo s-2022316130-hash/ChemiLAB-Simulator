@@ -6,7 +6,7 @@ import { symbolFor } from './symbols.js';
  * spec = { width, height, nodes:[{tag,type,label,x,y}], edges:[{id,from,to,points?,phase}] }
  */
 export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
-  const root = svg('svg', { viewBox: `0 0 ${spec.width} ${spec.height}`, width: '100%', height: '100%', style: 'display:block' });
+  const root = svg('svg', { class: 'fs-scroll', viewBox: `0 0 ${spec.width} ${spec.height}`, width: '100%', height: '100%', style: 'display:block' });
   // Drafting paper: a faint dot grid behind the diagram and a soft shadow under
   // every symbol. Both are static, so they cost one paint and nothing after it.
   const defs = svg('defs', {}, [
@@ -29,6 +29,8 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
   container.appendChild(root);
 
   const nodeEls = new Map(), edgeEls = new Map(), labelEls = new Map();
+  // Set by the pan handlers below; read by the node click handlers above them.
+  let panDistance = () => 0;
   const pos = Object.fromEntries(spec.nodes.map(n => [n.tag, [n.x, n.y]]));
 
   for (const e of spec.edges) {
@@ -80,11 +82,104 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
     tagText.setAttribute('transform', `translate(${n.x},${n.y})`);
     nameText.setAttribute('transform', `translate(${n.x},${n.y})`);
     g.appendChild(svg('title', { text: `${n.tag} — ${n.label || ''}` }));
-    g.addEventListener('click', () => onSelect?.(n.tag));
+    // A drag that happened to start on a symbol was a pan, not a selection.
+    g.addEventListener('click', () => { if (panDistance() <= 5) onSelect?.(n.tag); });
     g.addEventListener('mouseenter', () => onHover?.(n.tag));
     g.addEventListener('mouseleave', () => onHover?.(null));
     gNodes.appendChild(g); nodeEls.set(n.tag, g);
   }
+  // --- pan and zoom ---------------------------------------------------------
+  // A flowsheet drawn 1260 units wide is unreadable in a 360-pixel column, so
+  // the diagram is a surface you move around rather than a fixed picture:
+  // drag to pan, wheel or pinch to zoom, and a Fit control to get back.
+  const home = { x: 0, y: 0, w: spec.width, h: spec.height };
+  const vb = { ...home };
+  const MIN_W = spec.width / 10, MAX_W = spec.width * 1.4;
+  const applyView = () => root.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+
+  /** Pixels per diagram unit, allowing for the letterboxing of xMidYMid meet. */
+  function frame() {
+    const r = root.getBoundingClientRect();
+    const k = Math.min(r.width / vb.w, r.height / vb.h) || 1;
+    return { r, k, offX: (r.width - vb.w * k) / 2, offY: (r.height - vb.h * k) / 2 };
+  }
+  function toUser(clientX, clientY) {
+    const { r, k, offX, offY } = frame();
+    return { x: vb.x + (clientX - r.left - offX) / k, y: vb.y + (clientY - r.top - offY) / k };
+  }
+  /** Zoom by `factor` about a point that must stay where it is on screen. */
+  function zoomAt(clientX, clientY, factor) {
+    const p = toUser(clientX, clientY);
+    const w = Math.min(MAX_W, Math.max(MIN_W, vb.w / factor));
+    const f = vb.w / w;
+    vb.x = p.x - (p.x - vb.x) / f;
+    vb.y = p.y - (p.y - vb.y) / f;
+    vb.w = w; vb.h = home.h * (w / home.w);
+    applyView();
+  }
+  function fit() { Object.assign(vb, home); applyView(); }
+
+  root.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    zoomAt(ev.clientX, ev.clientY, Math.exp(-ev.deltaY * 0.0016));
+  }, { passive: false });
+
+  // Pointers are tracked by id so one finger pans and two pinch, on the same
+  // handlers a mouse uses. Pointer capture is deliberately not taken: it would
+  // redirect the click to the <svg> and a symbol could never be selected again.
+  // The move and release handlers go on the window instead, so a drag that
+  // leaves the panel still works.
+  const active = new Map();
+  let pinch = 0, dragged = 0;
+  const spread = () => {
+    const [a, b] = [...active.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
+  const centre = () => {
+    const pts = [...active.values()];
+    return { x: pts.reduce((t, q) => t + q.x, 0) / pts.length, y: pts.reduce((t, q) => t + q.y, 0) / pts.length };
+  };
+
+  root.addEventListener('pointerdown', ev => {
+    if (active.size === 0) dragged = 0;
+    active.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (active.size === 2) pinch = spread();
+  });
+
+  const onMove = ev => {
+    const prev = active.get(ev.pointerId);
+    if (!prev) return;
+    const dx = ev.clientX - prev.x, dy = ev.clientY - prev.y;
+    active.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    // Travel accumulates. A slow pan is made of small steps, and measuring only
+    // the largest of them would read a long drag as a tap.
+    dragged += Math.hypot(dx, dy);
+    if (active.size >= 2) {
+      const now = spread();
+      if (pinch > 0 && now > 0) { const c = centre(); zoomAt(c.x, c.y, now / pinch); }
+      pinch = now;
+      return;
+    }
+    const { k } = frame();
+    vb.x -= dx / k; vb.y -= dy / k;
+    applyView();
+  };
+  const onRelease = ev => {
+    active.delete(ev.pointerId);
+    if (active.size < 2) pinch = 0;
+  };
+  addEventListener('pointermove', onMove);
+  addEventListener('pointerup', onRelease);
+  addEventListener('pointercancel', onRelease);
+  // Double tap or double click to fit, which is what everyone tries first.
+  root.addEventListener('dblclick', fit);
+  panDistance = () => dragged;
+  const stopGestures = () => {
+    removeEventListener('pointermove', onMove);
+    removeEventListener('pointerup', onRelease);
+    removeEventListener('pointercancel', onRelease);
+  };
+
   let captions = { tags: true, names: true, streams: true };
   function applyCaptions() {
     gTags.style.display = captions.tags ? '' : 'none';
@@ -97,6 +192,13 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
     /** Which captions the diagram shows. Independent of what has been solved. */
     setCaptions(next) { captions = { ...captions, ...next }; applyCaptions(); return { ...captions }; },
     get captions() { return { ...captions }; },
+    /** Reset the view to the whole diagram. */
+    fit,
+    /** Zoom about the middle of the panel, for the on-screen controls. */
+    zoom(factor) {
+      const r = root.getBoundingClientRect();
+      zoomAt(r.left + r.width / 2, r.top + r.height / 2, factor);
+    },
     select(tag) { nodeEls.forEach((g, t) => g.classList.toggle('sel', t === tag)); },
     hover(tag) { nodeEls.forEach((g, t) => g.classList.toggle('hov', t === tag)); },
     /** streams: engine.getStreams() result; equipment: engine.getEquipmentState() */
@@ -143,6 +245,6 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
         b.setAttribute('stroke-width', '2');
       });
     },
-    dispose() { clear(container); }
+    dispose() { stopGestures(); clear(container); }
   };
 }

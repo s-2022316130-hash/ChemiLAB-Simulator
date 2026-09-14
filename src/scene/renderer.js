@@ -40,8 +40,15 @@ export function webglAvailable() {
  *    with the interface when the theme changes instead of being a dark island
  *    in a light page.
  */
+/** A phone is not a small laptop: it has a coarse pointer and a slow GPU behind
+ *  a very high pixel ratio, and both change what the renderer should do. */
+const coarsePointer = () => { try { return matchMedia('(pointer:coarse)').matches; } catch { return false; } };
+const smallScreen = () => Math.min(innerWidth, innerHeight) < 820;
+
 export function createPlantView(container, { onSelect, onHover } = {}) {
   if (!webglAvailable()) return { fallback: true, dispose() {} };
+  const touch = coarsePointer();
+  const handheld = touch && smallScreen();
 
   const hue = new THREE.Color(token('--hue', '#0e7490'));
   setSceneTheme(getTheme());
@@ -53,7 +60,11 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   const renderer = new THREE.WebGLRenderer({
     antialias: true, powerPreference: 'high-performance', stencil: false
   });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  // A phone reports a pixel ratio of 3 and has a fraction of the fill rate to
+  // pay for it. Rendering every one of those pixels buys nothing at arm's
+  // length and costs the frame rate that does matter.
+  const maxDpr = handheld ? 1.5 : 2;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, maxDpr));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.shadowMap.autoUpdate = false;
@@ -69,11 +80,36 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   controls.zoomSpeed = 0.9;
   controls.panSpeed = 0.7;
   controls.maxPolarAngle = Math.PI * 0.492;
+  // One finger orbits, two pan and pinch to zoom — the gestures a map uses.
+  controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+  if (touch) { controls.rotateSpeed = 0.55; controls.zoomSpeed = 1.1; }
   controls.minDistance = 6;
   controls.maxDistance = 190;
   controls.target.set(0, 4, 0);
 
   const env = createEnvironment(scene, renderer, hue);
+
+  /**
+   * How much further back a preset has to sit in this panel than in the wide
+   * one it was framed for. A perspective camera's field of view is vertical, so
+   * a tall narrow viewport sees far less across — which is exactly the shape a
+   * phone is. Without this the presets all open inside the plant.
+   */
+  const REFERENCE_ASPECT = 1.55;
+  const fitFactor = () => {
+    const a = camera.aspect || REFERENCE_ASPECT;
+    // Capped short of a full correction: a little cropping at the ends of a
+    // long plant is a better trade than a plant too small to read, and the view
+    // pans.
+    return a >= REFERENCE_ASPECT ? 1 : Math.min(1.75, REFERENCE_ASPECT / Math.max(a, 0.3));
+  };
+  /** A preset position pulled back to frame the same thing in this panel. */
+  function framed(pos, target) {
+    const k = fitFactor();
+    if (k === 1) return new THREE.Vector3(...pos);
+    const t = new THREE.Vector3(...target);
+    return t.clone().add(new THREE.Vector3(...pos).sub(t).multiplyScalar(k));
+  }
 
   const marker = selectionRing(hue); marker.visible = false; scene.add(marker);
   const captionScene = new THREE.Scene();
@@ -87,7 +123,7 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   // Caption switches. Three independent answers to three different questions —
   // which unit is this, what is it called, what is it doing — so turning them
   // all off is what "captions off" means.
-  let captions = { ...CAPTION_DEFAULT };
+  let captions = handheld ? { tags: true, names: false, values: false } : { ...CAPTION_DEFAULT };
   let equipmentState = {};
 
   const equipment = new Map();   // tag -> {group, meta, label}
@@ -188,7 +224,9 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   });
   // A click that followed a drag is an orbit, not a selection. Four pixels of
   // travel is the difference between pointing at a pump and looking around it.
-  el.addEventListener('click', ev => { if (moved <= 4) onSelect?.(pick(ev)); });
+  // A finger never lands as still as a mouse, so the threshold follows the device.
+  const tapSlop = touch ? 12 : 4;
+  el.addEventListener('click', ev => { if (moved <= tapSlop) onSelect?.(pick(ev)); });
 
   function syncOutline() {
     const list = [];
@@ -201,8 +239,11 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   }
 
   // --- quality -------------------------------------------------------------
-  const gov = createQualityGovernor();
+  // Handhelds start one tier down rather than spending their first seconds
+  // discovering that they cannot afford the top one.
+  const gov = createQualityGovernor(handheld ? { startTier: 'medium', budgetMs: 12, headroomMs: 8 } : {});
   const offTier = gov.onTier(applyTier);
+  if (handheld) applyTier(gov.tier);
   /**
    * What each tier buys and what it costs. Multisampling on a half-float
    * target is the expensive part on an integrated GPU — it is bandwidth, four
@@ -210,13 +251,13 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
    * the scene is rendered at, and only last the bloom itself.
    */
   function applyTier(tier) {
-    const dpr = devicePixelRatio || 1;
+    const dpr = Math.min(devicePixelRatio || 1, maxDpr);
     const samples = tier === 'high' ? 4 : tier === 'medium' ? 2 : 0;
     if (tier === 'high') {
       usePost = true;
-      renderer.setPixelRatio(Math.min(dpr, 2));
+      renderer.setPixelRatio(dpr);
       bloomPass.enabled = true;
-      env.setShadowQuality(true, 2048);
+      env.setShadowQuality(true, handheld ? 1024 : 2048);
     } else if (tier === 'medium') {
       usePost = true;
       renderer.setPixelRatio(Math.min(dpr, 1.25));
@@ -226,9 +267,9 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
       // Straight to the screen, where the hardware antialiasing the context was
       // created with does the job the multisampled target was doing.
       usePost = false;
-      renderer.setPixelRatio(1);
+      renderer.setPixelRatio(Math.min(dpr, 1));
       bloomPass.enabled = false;
-      env.setShadowQuality(true, 1024);
+      env.setShadowQuality(true, handheld ? 512 : 1024);
     }
     if (composer.renderTarget1.samples !== samples) {
       for (const target of [composer.renderTarget1, composer.renderTarget2]) {
@@ -236,7 +277,7 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
         target.samples = samples;
       }
     }
-    motes.visible = tier !== 'low';
+    motes.visible = tier !== 'low' && !handheld;
     composer.setPixelRatio(renderer.getPixelRatio());
     syncOutline();
     resize();
@@ -263,6 +304,9 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   let shadowClock = 0;
 
   const stopLoop = onFrame((dt, t) => {
+    // A tab layout hides the 3D panel rather than unmounting it. Rendering a
+    // view with no width costs a frame and shows nobody anything.
+    if (container.clientWidth < 2 || container.clientHeight < 2) return;
     controls.update();
 
     // Idle orbit: after eight seconds of stillness the camera drifts round the
@@ -424,7 +468,7 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
      */
     flyTo(pos, target = [0, 4, 0], ms = null) {
       const p0 = camera.position.clone(), t0 = controls.target.clone();
-      const p1 = new THREE.Vector3(...pos), t1 = new THREE.Vector3(...target);
+      const p1 = framed(pos, target), t1 = new THREE.Vector3(...target);
       const dist = p0.distanceTo(p1) + t0.distanceTo(t1);
       const dur = ms ?? Math.min(1500, Math.max(520, dist * 22));
       const start = performance.now();
@@ -438,6 +482,13 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
       });
     },
 
+    /** Place the camera at a preset immediately, framed for this panel. */
+    jumpTo(pos, target = [0, 4, 0]) {
+      camera.position.copy(framed(pos, target));
+      controls.target.set(...target);
+      controls.update();
+      refreshShadows();
+    },
     onTick(fn) { tickers.add(fn); return () => tickers.delete(fn); },
     refreshShadows,
     get fps() { return gov.fps; },
