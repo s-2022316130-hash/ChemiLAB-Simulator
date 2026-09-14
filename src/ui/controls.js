@@ -1,47 +1,166 @@
 import { el, clear } from '../shared/dom.js';
 import { panel } from '../shared/components/panel.js';
-import { visibleAt } from '../simulation/contract.js';
+import { visibleAt, Status } from '../simulation/contract.js';
+import { icon } from '../shared/icons.js';
+
 /**
- * Operator control panel built from engine.inputSpec.
- * Controls write raw user values into the store; they never pre-compute anything.
+ * Operator control panel, built from engine.inputSpec.
+ *
+ * Controls write raw user values into the store. They never pre-compute
+ * anything, never clamp, and never repair a value on the way past — an input
+ * outside the validated range is rejected by the engine with a reason, which is
+ * the whole point of having one.
+ *
+ * Two decisions are worth knowing about.
+ *
+ * The fields are built once per detail level and then *patched*, not rebuilt.
+ * The obvious implementation re-renders the panel whenever `inputs` changes,
+ * and since typing into a field changes `inputs`, the field is destroyed and
+ * replaced between one keystroke and the next — which takes the caret with it.
+ * Rebuilding happens only when the level changes, because that is the only
+ * thing that changes which fields exist.
+ *
+ * The slider track is filled to the value. A bare track says where the handle
+ * is; a filled one says where the value sits in the range the model was
+ * validated over, which is information the student needs and the engine
+ * already declared.
  */
 export function createControls(engine, store, { onRun } = {}) {
   const host = el('div');
-  const p = panel({ title: 'Operator controls', body: [host] });
-  function render() {
-    const { inputs, errors, level, status } = store.get();
+  const countChip = el('span', { class: 'tag' });
+
+  const runBtn = el('button', {
+    class: 'btn primary', html: `${icon('play')} Run simulation`,
+    onClick: () => onRun?.()
+  });
+  const resetBtn = el('button', {
+    class: 'btn', html: `${icon('reset')} Base case`,
+    title: 'Return every input to the design case for this unit',
+    onClick: () => store.set({ resetRequest: Date.now() })
+  });
+  const runNote = el('div', {
+    style: 'margin-top:8px;font-size:var(--t-fine);color:var(--ink-ghost);line-height:1.45'
+  });
+  const actions = el('div', { class: 'runbar' }, [
+    el('div', { class: 'btnrow' }, [runBtn, resetBtn]),
+    runNote
+  ]);
+
+  const p = panel({ title: 'Operator controls', right: countChip, body: [host, actions] });
+
+  let fields = new Map();     // key -> {row, input, slider, err}
+  let builtLevel = null;
+
+  /** Set the filled proportion of a slider track from its own value. */
+  function paintTrack(slider) {
+    const min = Number(slider.min), max = Number(slider.max), v = Number(slider.value);
+    const k = max > min ? ((v - min) / (max - min)) * 100 : 0;
+    slider.style.setProperty('--fill', `${Math.max(0, Math.min(100, k))}%`);
+  }
+
+  function write(key, value) {
+    // `dirty` travels with the value: the moment an input moves, whatever is on
+    // the results rail describes the previous case and says so.
+    store.set({ inputs: { ...store.get().inputs, [key]: value }, dirty: true });
+  }
+
+  function build(level) {
+    builtLevel = level;
+    fields = new Map();
     clear(host);
-    const groups = {};
+
+    const groups = new Map();
     for (const [key, def] of Object.entries(engine.inputSpec)) {
       if (!visibleAt(def.level || 'student', level)) continue;
-      (groups[def.group || 'Process'] ||= []).push([key, def]);
+      const g = def.group || 'Process';
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g).push([key, def]);
     }
-    for (const [g, items] of Object.entries(groups)) {
-      host.appendChild(el('div', { style: 'font-family:var(--mono);font-size:11px;color:var(--ink-faint);margin:10px 0 6px', text: g }));
+
+    let shown = 0;
+    for (const [group, items] of groups) {
+      host.appendChild(el('div', { class: 'sect', text: group }));
       for (const [key, def] of items) {
+        shown++;
         const input = el('input', {
-          type: 'number', value: inputs[key] ?? '', step: def.step ?? 'any',
-          min: def.min, max: def.max,
+          type: 'number', step: def.step ?? 'any', min: def.min, max: def.max,
+          'aria-label': def.label,
           onInput: e => {
             const v = e.target.value === '' ? null : Number(e.target.value);
-            store.set({ inputs: { ...store.get().inputs, [key]: v } });
+            if (slider && Number.isFinite(v)) { slider.value = String(v); paintTrack(slider); }
+            write(key, v);
           }
         });
-        const slider = def.min !== undefined && def.max !== undefined ? el('input', {
-          type: 'range', min: def.min, max: def.max, step: def.step ?? (def.max - def.min) / 100, value: inputs[key] ?? def.min,
-          onInput: e => { input.value = e.target.value; store.set({ inputs: { ...store.get().inputs, [key]: Number(e.target.value) } }); }
+
+        const hasRange = def.min !== undefined && def.max !== undefined;
+        const slider = hasRange ? el('input', {
+          type: 'range', min: def.min, max: def.max,
+          step: def.step ?? (def.max - def.min) / 100,
+          tabindex: '-1', 'aria-hidden': 'true',
+          onInput: e => {
+            input.value = e.target.value;
+            paintTrack(e.target);
+            write(key, Number(e.target.value));
+          }
         }) : null;
-        host.appendChild(el('div', { class: 'field' }, [
-          el('label', { text: def.label }), el('span', { class: 'unit', text: def.unit || '' }),
-          input, slider, errors?.[key] && el('div', { class: 'err', text: errors[key] })
-        ].filter(Boolean)));
+
+        const err = el('div', { class: 'err', style: 'display:none' });
+        const row = el('div', { class: 'field' }, [
+          el('label', { text: def.label }),
+          el('span', { class: 'unit', text: def.unit || '' }),
+          input,
+          slider,
+          hasRange ? el('div', { class: 'range-ends' }, [
+            el('span', { text: fmtEnd(def.min) }),
+            el('span', { text: fmtEnd(def.max) })
+          ]) : null,
+          err
+        ].filter(Boolean));
+
+        host.appendChild(row);
+        fields.set(key, { row, input, slider, err });
       }
     }
-    host.appendChild(el('div', { class: 'btnrow', style: 'margin-top:12px' }, [
-      el('button', { class: 'btn primary', text: 'Run simulation', disabled: status === 'CALCULATING', onClick: () => onRun?.() }),
-      el('button', { class: 'btn', text: 'Reset to base case', onClick: () => store.set({ resetRequest: Date.now() }) })
-    ]));
+    countChip.textContent = `${shown} inputs`;
   }
-  store.subKeys(['inputs', 'errors', 'level', 'status'], render);
+
+  /** Patch the built fields from the store without touching their identity. */
+  function sync(state) {
+    const { inputs, errors, status, dirty } = state;
+    for (const [key, f] of fields) {
+      const v = inputs[key];
+      // Never overwrite a field someone is typing into. Anything else is the
+      // interface arguing with the person using it.
+      if (document.activeElement !== f.input) f.input.value = v ?? '';
+      if (f.slider && Number.isFinite(v)) { f.slider.value = String(v); paintTrack(f.slider); }
+      const msg = errors?.[key];
+      f.err.textContent = msg || '';
+      f.err.style.display = msg ? '' : 'none';
+      f.row.dataset.invalid = String(!!msg);
+    }
+    const busy = status === Status.CALCULATING || status === Status.CONVERGING;
+    runBtn.disabled = busy;
+    runBtn.innerHTML = busy ? `${icon('spinner')} Solving…` : `${icon('play')} Run simulation`;
+    runBtn.dataset.busy = String(busy);
+    runNote.textContent = busy
+      ? 'Closing the balances.'
+      : dirty && (status === Status.COMPLETE || status === Status.WARNING)
+        ? 'Inputs have changed since the last run — the results rail still shows the previous case.'
+        : status === Status.READY
+          ? 'Nothing has been calculated yet.'
+          : '';
+    actions.dataset.dirty = String(!!dirty);
+  }
+
+  store.subKeys(['level'], s => { if (s.level !== builtLevel) { build(s.level); sync(store.get()); } });
+  store.subKeys(['inputs', 'errors', 'status', 'dirty'], sync);
   return p;
+}
+
+/** Range ends read as bounds, not as measurements: no trailing zeros. */
+function fmtEnd(v) {
+  if (v === null || v === undefined || !Number.isFinite(v)) return '';
+  const a = Math.abs(v);
+  if (a !== 0 && (a >= 1e5 || a < 1e-3)) return v.toExponential(1);
+  return String(Math.round(v * 1000) / 1000);
 }

@@ -6,7 +6,10 @@
  * flowsheet — reads it from here rather than repeating a hex. That is what
  * keeps the plant and the interface the same shade of the same colour.
  *
- * Light is the default. The choice is remembered per browser, and the system
+ * Dark is the default, because a control room is a dark room: an instrument is
+ * read as a luminous mark on a deep ground, and that is the register this
+ * belongs to. Light is a second, deliberately designed environment rather than
+ * an inversion of it. The choice is remembered per browser, and the system
  * preference is only consulted the first time, before a choice has been made.
  */
 const KEY = 'chemilab.theme.v1';
@@ -18,13 +21,14 @@ function stored() {
   catch { return null; }
 }
 function systemPreference() {
-  try { return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
-  catch { return 'light'; }
+  // Only an explicit system preference for light moves off the default.
+  try { return matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'; }
+  catch { return 'dark'; }
 }
 
 /** The theme in force, whether it was chosen, inherited or defaulted. */
 export function getTheme() {
-  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
 }
 
 /**
@@ -33,7 +37,7 @@ export function getTheme() {
  * whole application in step.
  */
 export function setTheme(theme, { persist = true } = {}) {
-  const next = THEMES.includes(theme) ? theme : 'light';
+  const next = THEMES.includes(theme) ? theme : 'dark';
   document.documentElement.dataset.theme = next;
   document.documentElement.style.colorScheme = next;
   if (persist) { try { localStorage.setItem(KEY, next); } catch { /* private mode: honour it for this session only */ } }

@@ -42,7 +42,10 @@ function roundRect(c, x, y, w, h, r) {
  * engine reports new values, without rebuilding the object in the scene.
  */
 function drawCaption({ tag, name, rows, accent, hue }) {
-  const dpr = 2;
+  // Drawn at the display's own pixel ratio rather than at a fixed 2. A caption
+  // is text, and text upscaled from a 2x plate onto a 3x panel is the one thing
+  // in the scene a reader will notice is soft.
+  const dpr = Math.min(Math.max(globalThis.devicePixelRatio || 1, 2), 3);
   const padX = 13, padY = 9, gap = 3, rowGap = 3, shadow = 6;
   const tagSize = 20, nameSize = 13.5, valSize = 12.5;
 
@@ -128,7 +131,7 @@ function drawCaption({ tag, name, rows, accent, hue }) {
   const tex = new THREE.CanvasTexture(cv);
   tex.minFilter = THREE.LinearFilter;
   tex.generateMipmaps = false;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
   if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
   return { tex, w: W, h: H };
 }

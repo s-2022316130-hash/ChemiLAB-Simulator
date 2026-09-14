@@ -89,15 +89,20 @@ says what to change.
 to the status lifecycle and discards superseded runs with a token counter, so a slow run
 can never overwrite a newer one.
 
-## Colour
+## Design system
 
-`shared/theme.css` holds every colour in the application as a semantic token, and
-`shared/theme.js` is the only way anything outside CSS reads one. Nothing else names a
-hex. Three consequences:
+`shared/tokens.css` holds every colour, elevation, radius, type step and duration in
+the application as a semantic token. `shared/theme.css` spends them and introduces no
+hex of its own, and `shared/theme.js` is the only way anything outside CSS reads one.
+Four consequences:
 
-- **Light and dark are one design.** `data-theme` on `<html>` swaps the token values;
-  every component follows without knowing a theme exists. The choice is remembered per
-  browser and applied before first paint by an inline script in `index.html`.
+- **Dark is the foundation.** A control room is a dark room: an instrument is read as a
+  luminous mark on a deep ground. Light is a second, deliberately designed environment —
+  a laboratory in daylight — with its own contrast decisions, its own shadows and its own
+  scene lighting rig, rather than an inversion of the dark one. `data-theme` on `<html>`
+  swaps the token values; every component follows without knowing a theme exists. The
+  choice is remembered per browser and applied before first paint by an inline script in
+  `index.html`.
 - **The plant is lit by the same palette as the interface.** The `--scene-*` tokens —
   sky, ground, fog, light intensities, exposure, bloom strength — are read by
   `scene/env.js` at build and again on every theme change.
@@ -105,9 +110,30 @@ hex. Three consequences:
   CSS and by `scene/streams.js` through `token()`, so the plant and the diagram cannot
   drift apart.
 
-`data-sim` carries each simulator's signature hue, which tints the accent, the rails,
-the rim light and the sky. It is set before the workspace mounts, because the renderer
-reads it at construction.
+`data-sim` carries each simulator's signature hue — aquatic blue, amber, emerald,
+magenta, violet — which tints the accent, the rails, the page atmosphere, the rim light
+and the sky. It is set before the workspace mounts, because the renderer reads it at
+construction. Entering a simulator is meant to feel like entering a different facility
+while the system around it stays identical.
+
+## Layout
+
+Three column widths, one component language:
+
+| Width | Layout |
+|---|---|
+| above 1180 px | three columns — controls, views, results rail |
+| 901–1180 px | views full width, controls and rail side by side under them |
+| below 900 px | four screens, bottom navigation, floating run action, bottom sheet for equipment |
+
+The phone layout is a CSS decision driven by `data-active` attributes, so nothing is
+rebuilt when the window changes size and the WebGL context is never lost — a tab that
+unmounted the canvas would have to recompile every shader on the way back.
+
+A perspective camera's field of view is vertical, so a phone held upright sees far less
+across than the landscape panel the camera presets were framed for. `renderer.js`
+corrects in two places: the field of view opens to 64° (past which a column's verticals
+start to bow) and standing further back covers the rest, capped at 2.8×.
 
 ## Performance
 
@@ -129,8 +155,11 @@ What keeps the frame cheap:
   primitives arrives as several hundred small meshes — a staircase is one per tread — and
   draw calls, not triangles, are what an integrated GPU runs out of. Named meshes and
   named groups are left alone: that is how a plant module reaches the parts it drives.
-- **Shadows are static**, re-rendered on demand and a few times a second at full quality.
-  The sun does not move and neither does most of the plant.
+- **Shadows are static**, re-rendered on demand and every 0.4 s at full quality. The sun
+  does not move and neither does most of the plant. That interval is measured rather than
+  chosen: a shadow pass over a plant at 3072² costs a large fraction of a frame, and
+  moving it from 0.4 s to 0.25 s took the smoothed frame cost from 4 ms to 36 ms for the
+  same picture.
 - **Captions are their own scene**, composited after post-processing. Text stays crisp,
   never picks up bloom, and compositing it does not mean walking the plant twice.
 - **Transparency is rationed.** It was half the frame budget on the reference machine

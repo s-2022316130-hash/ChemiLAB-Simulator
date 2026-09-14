@@ -1,50 +1,162 @@
 import { svg, clear } from '../dom.js';
-// Dependency-free SVG charts. Data comes from the engine only.
-const C = { ink: 'var(--ink-dim)', line: 'var(--line)', acc: 'var(--accent)' };
-function axes(w, h, pad) {
-  return [svg('path', { d: `M${pad} ${pad} V${h - pad} H${w - pad}`, stroke: C.line, fill: 'none' })];
+
+/**
+ * Dependency-free SVG charts. Data comes from the engine only — nothing here
+ * computes a process value, and a series with no points says "not calculated"
+ * rather than drawing an empty axis as if zero were the answer.
+ *
+ * The house style: a baseline and gridlines rather than a box, tick labels in
+ * the mono face at the ends of each scale, and the line itself as the only
+ * saturated thing in the frame. A chart in this rail is a supporting reading,
+ * so it is drawn to be understood at a glance and not to be admired.
+ */
+const PAD = { l: 38, r: 10, t: 12, b: 24 };
+
+const fmtTick = v => {
+  const a = Math.abs(v);
+  if (a === 0) return '0';
+  if (a >= 1e4 || a < 1e-2) return v.toExponential(0);
+  if (a >= 100) return v.toFixed(0);
+  if (a >= 10) return v.toFixed(1);
+  return v.toFixed(2);
+};
+
+const empty = (root, w, h) => {
+  root.appendChild(svg('text', {
+    x: w / 2, y: h / 2, fill: 'var(--ink-ghost)', 'font-size': 11,
+    'font-family': 'var(--font)', 'text-anchor': 'middle', text: 'Not calculated'
+  }));
+  return root;
+};
+
+/** Horizontal gridlines with their values, and a baseline along the bottom. */
+function grid(root, w, h, y0, y1, sy, lines = 3) {
+  for (let i = 0; i <= lines; i++) {
+    const v = y0 + (y1 - y0) * (i / lines);
+    const y = sy(v);
+    root.appendChild(svg('path', {
+      d: `M${PAD.l} ${y.toFixed(1)} H${w - PAD.r}`,
+      stroke: i === 0 ? 'var(--line-strong)' : 'var(--line-soft)', fill: 'none',
+      'stroke-width': i === 0 ? 1 : 1
+    }));
+    root.appendChild(svg('text', {
+      x: PAD.l - 6, y: (y + 3.2).toFixed(1), fill: 'var(--ink-ghost)', 'font-size': 8.5,
+      'font-family': 'var(--mono)', 'text-anchor': 'end', text: fmtTick(v)
+    }));
+  }
 }
-export function lineChart({ series = [], width = 300, height = 150, xLabel = '', yLabel = '' }) {
-  const pad = 28, root = svg('svg', { viewBox: `0 0 ${width} ${height}`, width: '100%', role: 'img' });
-  axes(width, height, pad).forEach(n => root.appendChild(n));
+
+export function lineChart({ series = [], width = 320, height = 160, xLabel = '', yLabel = '' }) {
+  const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, width: '100%', role: 'img' });
   const pts = series.flatMap(s => s.points || []);
-  if (!pts.length) { root.appendChild(svg('text', { x: width / 2, y: height / 2, fill: 'var(--ink-faint)', 'font-size': 11, 'text-anchor': 'middle', text: 'Not calculated' })); return root; }
+  if (!pts.length) return empty(root, width, height);
+
   const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs) || 1, y0 = Math.min(...ys, 0), y1 = Math.max(...ys) || 1;
-  const sx = v => pad + (v - x0) / ((x1 - x0) || 1) * (width - 2 * pad);
-  const sy = v => (height - pad) - (v - y0) / ((y1 - y0) || 1) * (height - 2 * pad);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const y0 = Math.min(...ys, 0), y1 = Math.max(...ys);
+  const sx = v => PAD.l + (v - x0) / ((x1 - x0) || 1) * (width - PAD.l - PAD.r);
+  const sy = v => (height - PAD.b) - (v - y0) / ((y1 - y0) || 1) * (height - PAD.t - PAD.b);
+
+  grid(root, width, height, y0, y1 || 1, sy);
+
   series.forEach((s, i) => {
+    const colour = s.color || 'var(--hue)';
     const d = s.points.map((p, j) => `${j ? 'L' : 'M'}${sx(p[0]).toFixed(1)} ${sy(p[1]).toFixed(1)}`).join(' ');
-    root.appendChild(svg('path', { d, fill: 'none', stroke: s.color || C.acc, 'stroke-width': 1.6, opacity: 1 - i * 0.2 }));
+    // A faint area under the first series. It is what makes the shape of a
+    // curve readable at this size; a second one would be a mess, so only the
+    // first gets it.
+    if (i === 0) {
+      const base = sy(y0).toFixed(1);
+      root.appendChild(svg('path', {
+        d: `${d} L${sx(s.points[s.points.length - 1][0]).toFixed(1)} ${base} L${sx(s.points[0][0]).toFixed(1)} ${base} Z`,
+        fill: colour, opacity: 0.1, stroke: 'none'
+      }));
+    }
+    root.appendChild(svg('path', {
+      d, fill: 'none', stroke: colour, 'stroke-width': 1.8,
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 1 - i * 0.28
+    }));
   });
-  if (yLabel) root.appendChild(svg('text', { x: 2, y: 10, fill: C.ink, 'font-size': 9, text: yLabel }));
-  if (xLabel) root.appendChild(svg('text', { x: width - pad, y: height - 4, fill: C.ink, 'font-size': 9, 'text-anchor': 'end', text: xLabel }));
+
+  // Scale ends, so the axis is readable without a full tick ladder.
+  root.appendChild(svg('text', {
+    x: PAD.l, y: height - 6, fill: 'var(--ink-ghost)', 'font-size': 8.5,
+    'font-family': 'var(--mono)', text: fmtTick(x0)
+  }));
+  root.appendChild(svg('text', {
+    x: width - PAD.r, y: height - 6, fill: 'var(--ink-ghost)', 'font-size': 8.5,
+    'font-family': 'var(--mono)', 'text-anchor': 'end', text: fmtTick(x1)
+  }));
+  if (xLabel) root.appendChild(svg('text', {
+    x: (PAD.l + width - PAD.r) / 2, y: height - 6, fill: 'var(--ink-faint)', 'font-size': 9,
+    'font-family': 'var(--font)', 'text-anchor': 'middle', text: xLabel
+  }));
+  if (yLabel) root.appendChild(svg('text', {
+    x: 2, y: 9, fill: 'var(--ink-faint)', 'font-size': 9, 'font-family': 'var(--font)', text: yLabel
+  }));
   return root;
 }
-export function barChart({ bars = [], width = 300, height = 150, unit = '' }) {
-  const pad = 26, root = svg('svg', { viewBox: `0 0 ${width} ${height}`, width: '100%' });
-  axes(width, height, pad).forEach(n => root.appendChild(n));
-  if (!bars.length) { root.appendChild(svg('text', { x: width / 2, y: height / 2, fill: 'var(--ink-faint)', 'font-size': 11, 'text-anchor': 'middle', text: 'Not calculated' })); return root; }
-  const max = Math.max(...bars.map(b => b.value)) || 1, bw = (width - 2 * pad) / bars.length;
+
+export function barChart({ bars = [], width = 320, height = 160, unit = '' }) {
+  const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, width: '100%', role: 'img' });
+  if (!bars.length) return empty(root, width, height);
+
+  const max = Math.max(...bars.map(b => b.value), 0) || 1;
+  const sy = v => (height - PAD.b) - (v / max) * (height - PAD.t - PAD.b);
+  grid(root, width, height, 0, max, sy, 2);
+
+  const span = (width - PAD.l - PAD.r) / bars.length;
   bars.forEach((b, i) => {
-    const h = (b.value / max) * (height - 2 * pad - 12);
-    root.appendChild(svg('rect', { x: pad + i * bw + bw * 0.2, y: height - pad - h, width: bw * 0.6, height: Math.max(h, 0.5), fill: b.color || C.acc, opacity: .85 }));
-    root.appendChild(svg('text', { x: pad + i * bw + bw * 0.5, y: height - pad + 10, fill: C.ink, 'font-size': 9, 'text-anchor': 'middle', text: b.label }));
+    const x = PAD.l + i * span + span * 0.22;
+    const w = span * 0.56;
+    const y = sy(Math.max(b.value, 0));
+    root.appendChild(svg('rect', {
+      x: x.toFixed(1), y: y.toFixed(1), width: w.toFixed(1),
+      height: Math.max(height - PAD.b - y, 1).toFixed(1),
+      rx: 2, fill: b.color || 'var(--hue)', opacity: 0.85
+    }));
+    root.appendChild(svg('text', {
+      x: (x + w / 2).toFixed(1), y: height - 9, fill: 'var(--ink-faint)', 'font-size': 8.5,
+      'font-family': 'var(--font)', 'text-anchor': 'middle', text: b.label
+    }));
   });
-  if (unit) root.appendChild(svg('text', { x: 2, y: 10, fill: C.ink, 'font-size': 9, text: unit }));
+  if (unit) root.appendChild(svg('text', {
+    x: 2, y: 9, fill: 'var(--ink-faint)', 'font-size': 9, 'font-family': 'var(--font)', text: unit
+  }));
   return root;
 }
-export function gauge({ value, min = 0, max = 100, label = '', unit = '%', size = 110 }) {
-  const root = svg('svg', { viewBox: '0 0 120 76', width: size });
-  const arc = (frac, color, w) => {
-    const a = Math.PI * (1 - frac), x = 60 + 48 * Math.cos(a), y = 64 - 48 * Math.sin(a);
-    return svg('path', { d: `M12 64 A48 48 0 ${frac > .5 ? 1 : 0} 1 ${x.toFixed(2)} ${y.toFixed(2)}`, stroke: color, 'stroke-width': w, fill: 'none', 'stroke-linecap': 'round' });
+
+/**
+ * A single reading against a scale. The track is drawn all the way round so the
+ * empty part of the range is visible — a gauge whose unfilled arc is invisible
+ * shows a number, not a position in a range.
+ */
+export function gauge({ value, min = 0, max = 100, label = '', unit = '%', size = 128 }) {
+  const root = svg('svg', { viewBox: '0 0 120 78', width: size, role: 'img' });
+  const arc = (frac, colour, w, opacity = 1) => {
+    const a = Math.PI * (1 - Math.max(0, Math.min(1, frac)));
+    const x = 60 + 48 * Math.cos(a), y = 64 - 48 * Math.sin(a);
+    return svg('path', {
+      d: `M12 64 A48 48 0 ${frac > 0.5 ? 1 : 0} 1 ${x.toFixed(2)} ${y.toFixed(2)}`,
+      stroke: colour, 'stroke-width': w, fill: 'none', 'stroke-linecap': 'round', opacity
+    });
   };
-  root.appendChild(arc(1, 'var(--bg-3)', 9));
+  root.appendChild(arc(1, 'var(--bg-3)', 8));
   const has = value !== null && value !== undefined && !Number.isNaN(value);
-  if (has) root.appendChild(arc(Math.max(0, Math.min(1, (value - min) / (max - min))), C.acc, 9));
-  root.appendChild(svg('text', { x: 60, y: 58, 'text-anchor': 'middle', fill: 'var(--ink)', 'font-size': 16, 'font-family': 'var(--mono)', text: has ? `${value.toFixed(1)}` : '—' }));
-  root.appendChild(svg('text', { x: 60, y: 72, 'text-anchor': 'middle', fill: 'var(--ink-faint)', 'font-size': 8, text: `${label} ${has ? unit : ''}`.trim() }));
+  if (has) {
+    const frac = (value - min) / ((max - min) || 1);
+    root.appendChild(arc(frac, 'var(--hue)', 8));
+  }
+  root.appendChild(svg('text', {
+    x: 60, y: 57, 'text-anchor': 'middle', fill: 'var(--ink)', 'font-size': 17,
+    'font-family': 'var(--mono)', 'font-weight': '600',
+    text: has ? value.toFixed(1) : '—'
+  }));
+  root.appendChild(svg('text', {
+    x: 60, y: 72, 'text-anchor': 'middle', fill: 'var(--ink-ghost)', 'font-size': 8,
+    'font-family': 'var(--mono)', text: `${label} ${has ? unit : ''}`.trim()
+  }));
   return root;
 }
+
 export { clear };

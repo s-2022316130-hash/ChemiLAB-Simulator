@@ -957,9 +957,10 @@ function buildResults(s, x, fx) {
     energyIntensity: field('Energy per unit of sales gas', only(s.energyPerMMSCFD), 'kW per MMSCFD', 0)
   };
 
+  // The verdict travels as a field rather than as words appended to the label,
+  // so the results rail can mark it and the label stays the name of the thing.
   const spec = (label, value, unit, digits, pass, limit) => ({
-    label: pass === null ? label : `${label} — ${pass ? 'on specification' : 'off specification'}`,
-    value, unit, digits, kind: KIND.CORR, limit
+    label, value, unit, digits, kind: KIND.CORR, limit, pass
   });
   const quality = {
     h2s: spec('Hydrogen sulphide', only(s.salesH2S), 'ppmv', 2, s.specs.h2s),

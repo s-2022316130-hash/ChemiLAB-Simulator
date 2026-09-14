@@ -1,52 +1,87 @@
 import { el } from '../shared/dom.js';
 import { panel, kv, collapsible } from '../shared/components/panel.js';
+import { icon } from '../shared/icons.js';
+
 /**
- * Equipment information schema. Every field is required for a real entry —
- * an incomplete card is better shown as "documentation pending" than invented.
+ * Equipment information card.
+ *
+ * Every field is required for a real entry — an incomplete card is better shown
+ * as "documentation pending" than invented.
+ *
  * {tag,name,type,purpose,howItWorks,whyUsed,inputs[],outputs[],
  *  operatingVariables[], designVariables[], misoperation[],
  *  theory, equations[], practice, safety[], troubleshooting[{symptom,cause,action}]}
+ *
+ * The order is the order someone asks the questions: what is this, what is it
+ * doing right now, how does it work, why is it here, and only then the depth.
+ * Live readings sit directly under the name because they are the part that
+ * changes; everything below them is reference and is collapsed by default.
  */
 export function equipmentCard(info, liveValues = null) {
-  if (!info) return panel({ title: 'Equipment', body: [el('div', { class: 'fallback', text: 'Select an item in the plant or the flowsheet.' })] });
-  const list = (items) => el('ul', { style: 'margin:4px 0 8px 16px;padding:0;color:var(--ink-dim);font-size:12.5px' },
-    (items || []).map(i => el('li', { text: i })));
-  const body = [
-    el('div', { style: 'display:flex;gap:8px;align-items:center;margin-bottom:6px' }, [
-      el('strong', { text: info.name }), el('span', { class: 'tag', text: info.tag })
-    ]),
-    el('p', { style: 'margin:0 0 10px;color:var(--ink-dim);font-size:13px', text: info.purpose }),
-  ];
-  if (liveValues && Object.keys(liveValues).length) {
-    body.push(el('div', { style: 'margin-bottom:8px' }, Object.entries(liveValues).map(([k, v]) => kv(k, v))));
+  if (!info) {
+    return panel({
+      title: 'Equipment',
+      body: [el('div', { class: 'empty' }, [
+        el('div', { class: 'glyph', html: icon('cursor') }),
+        el('b', { text: 'Nothing selected' }),
+        el('p', { text: 'Click a unit in the 3D plant or on the flowsheet. Both views select together.' })
+      ])]
+    });
   }
+
+  const list = items => el('ul', { class: 'eq-list' }, (items || []).map(i => el('li', { text: i })));
+  const prose = text => el('p', { class: 'eq-prose', text });
+
+  const body = [
+    el('div', { class: 'eq-head' }, [
+      el('span', { class: 'eq-tag', text: info.tag }),
+      el('div', {}, [
+        el('strong', { class: 'eq-name', text: info.name }),
+        info.type ? el('span', { class: 'eq-type', text: info.type }) : null
+      ].filter(Boolean))
+    ]),
+    prose(info.purpose)
+  ];
+
+  if (liveValues && Object.keys(liveValues).length) {
+    body.push(
+      el('div', { class: 'sect', dataset: { accent: 'true' }, text: 'Live from the model' }),
+      el('div', { class: 'eq-live' }, Object.entries(liveValues).map(([k, v]) => kv(k, v)))
+    );
+  }
+
   body.push(
-    collapsible('How it works', [el('p', { style: 'font-size:12.5px;color:var(--ink-dim)', text: info.howItWorks })], true),
-    collapsible('Why it is used', [el('p', { style: 'font-size:12.5px;color:var(--ink-dim)', text: info.whyUsed })]),
-    collapsible('Inputs and outputs', [el('div', {}, [el('div', { text: 'In', style: 'font-size:11px;color:var(--ink-faint)' }), list(info.inputs), el('div', { text: 'Out', style: 'font-size:11px;color:var(--ink-faint)' }), list(info.outputs)])]),
+    collapsible('How it works', [prose(info.howItWorks)], true),
+    collapsible('Why it is used', [prose(info.whyUsed)]),
+    collapsible('Inputs and outputs', [el('div', {}, [
+      el('div', { class: 'eq-sub', text: 'In' }), list(info.inputs),
+      el('div', { class: 'eq-sub', text: 'Out' }), list(info.outputs)
+    ])]),
     collapsible('Key operating variables', [list(info.operatingVariables)]),
     collapsible('Design variables', [list(info.designVariables)]),
     collapsible('If it is misoperated', [list(info.misoperation)]),
-    info.theory && collapsible('Theory', [el('p', { style: 'font-size:12.5px;color:var(--ink-dim)', text: info.theory })]),
+    info.theory && collapsible('Theory', [prose(info.theory)]),
     info.equations?.length && collapsible('Equations', info.equations.map(equationBlock)),
-    info.practice && collapsible('Industrial practice', [el('p', { style: 'font-size:12.5px;color:var(--ink-dim)', text: info.practice })]),
+    info.practice && collapsible('Industrial practice', [prose(info.practice)]),
     info.safety?.length && collapsible('Safety', [list(info.safety)]),
     info.troubleshooting?.length && collapsible('Troubleshooting', info.troubleshooting.map(t =>
-      el('div', { style: 'margin-bottom:8px;font-size:12.5px' }, [
-        el('div', { text: t.symptom }),
-        el('div', { style: 'color:var(--ink-faint)', text: `Likely cause: ${t.cause}` }),
-        el('div', { style: 'color:var(--accent)', text: `Action: ${t.action}` })
+      el('div', { class: 'tshoot' }, [
+        el('div', { class: 'ts-sym' }, [el('span', { class: 'ts-i', html: icon('alert') }), el('span', { text: t.symptom })]),
+        el('div', { class: 'ts-row' }, [el('b', { text: 'Likely cause' }), el('span', { text: t.cause })]),
+        el('div', { class: 'ts-row ts-act' }, [el('b', { text: 'Action' }), el('span', { text: t.action })])
       ])))
   );
+
   return panel({ title: 'Equipment inspection', body: body.filter(Boolean) });
 }
+
 export function equationBlock(eq) {
-  return el('div', { style: 'margin-bottom:10px' }, [
-    el('div', { style: 'font-size:12.5px', text: eq.what }),
-    el('code', { style: 'display:block;margin:4px 0;padding:6px 8px;background:var(--bg-2);border-left:2px solid var(--accent-deep);font-family:var(--mono);font-size:12px;white-space:pre-wrap', text: eq.equation }),
-    eq.why && el('div', { style: 'font-size:11.5px;color:var(--ink-dim)', text: `Why it matters: ${eq.why}` }),
-    eq.inputs && el('div', { style: 'font-size:11.5px;color:var(--ink-faint)', text: `Inputs: ${eq.inputs.join(', ')}` }),
-    eq.units && el('div', { style: 'font-size:11.5px;color:var(--ink-faint)', text: `Units: ${eq.units}` }),
-    eq.interpretation && el('div', { style: 'font-size:11.5px;color:var(--ink-dim)', text: eq.interpretation })
+  return el('div', { class: 'eqn' }, [
+    el('div', { class: 'eqn-what', text: eq.what }),
+    el('code', { class: 'eqn-code', text: eq.equation }),
+    eq.why && el('div', { class: 'eqn-note', text: `Why it matters: ${eq.why}` }),
+    eq.inputs && el('div', { class: 'eqn-meta', text: `Inputs: ${eq.inputs.join(', ')}` }),
+    eq.units && el('div', { class: 'eqn-meta', text: `Units: ${eq.units}` }),
+    eq.interpretation && el('div', { class: 'eqn-note', text: eq.interpretation })
   ].filter(Boolean));
 }

@@ -1,24 +1,40 @@
 import { el, clear } from '../shared/dom.js';
 import { href } from './router.js';
 import { getTheme, toggleTheme, onThemeChange } from '../shared/theme.js';
+import { icon } from '../shared/icons.js';
 
-const SUN = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.4M12 19.6V22M4.2 4.2l1.7 1.7M18.1 18.1l1.7 1.7M2 12h2.4M19.6 12H22M4.2 19.8l1.7-1.7M18.1 5.9l1.7-1.7"/></svg>';
-const MOON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1Z"/></svg>';
+/**
+ * Application shell: the masthead and the view it frames.
+ *
+ * The masthead has one job beyond navigation — to say, at a glance and without
+ * being read, which facility you are standing in. It does that three ways at
+ * once: the breadcrumb names it, the hairline under the bar takes its colour,
+ * and every accent on the page follows from the same token. None of those is
+ * text you have to stop and read.
+ *
+ * It never wraps and never grows. A two-line header pushes the workspace down
+ * the page, and the workspace is the product.
+ */
+
+const SIGNIFIER = 'Process simulation';
 
 export function createShell(mount) {
   const view = el('main', { class: 'view' });
+
   const nav = el('nav', {}, [
-    el('a', { href: href.home, text: 'Home' }),
+    el('a', { href: href.home, text: 'Overview' }),
     el('a', { href: href.simulators, text: 'Simulators' })
   ]);
-  const context = el('span', { class: 'tag', text: 'no simulator loaded' });
 
-  // Theme switch. It shows the theme it will move to, which is the convention
-  // people already read these controls by.
+  // Breadcrumb: CHEMILAB / INDUSTRIAL DRYER / PROCESS SIMULATION. On the
+  // overview it collapses to the product on its own, because there is no
+  // location to report and a crumb trail of one item is noise.
+  const crumbs = el('div', { class: 'crumbs' });
+
   const themeBtn = el('button', { class: 'iconbtn' });
   const paintThemeBtn = () => {
     const dark = getTheme() === 'dark';
-    themeBtn.innerHTML = dark ? SUN : MOON;
+    themeBtn.innerHTML = icon(dark ? 'sun' : 'moon');
     themeBtn.title = dark ? 'Switch to the light theme' : 'Switch to the dark theme';
     themeBtn.setAttribute('aria-label', themeBtn.title);
   };
@@ -27,23 +43,38 @@ export function createShell(mount) {
   paintThemeBtn();
 
   const top = el('header', { class: 'topbar' }, [
-    el('div', { class: 'brand' }, [
+    el('a', { class: 'brand', href: href.home, title: 'ChemiLAB Simulator' }, [
       el('span', { class: 'mark', text: 'CL' }),
       el('span', { class: 'wordmark' }, [
-        el('b', { text: 'ChemiLAB Simulator' }),
-        el('span', { text: 'Chemical engineering virtual plant' })
+        el('b', { text: 'ChemiLAB' }),
+        el('span', { text: 'Virtual plant' })
       ])
     ]),
-    nav, el('div', { class: 'spacer' }), context, themeBtn
+    nav,
+    el('div', { class: 'spacer' }),
+    crumbs,
+    themeBtn
   ]);
+
   mount.append(top, view);
+
   return {
     view,
     setRoute(route, title) {
       [...nav.children].forEach(a => a.removeAttribute('aria-current'));
-      const target = route.name === 'home' ? 0 : 1;
-      nav.children[target]?.setAttribute('aria-current', 'page');
-      context.textContent = title || 'no simulator loaded';
+      nav.children[route.name === 'home' ? 0 : 1]?.setAttribute('aria-current', 'page');
+
+      clear(crumbs);
+      if (title) {
+        crumbs.append(
+          el('i', { text: '/' }),
+          el('span', { class: 'here', text: title }),
+          el('i', { class: 'leaf', text: '/' }),
+          el('span', { class: 'leaf', text: SIGNIFIER })
+        );
+      } else {
+        crumbs.appendChild(el('span', { class: 'leaf', text: 'Five process units' }));
+      }
     },
     clearView: () => clear(view)
   };

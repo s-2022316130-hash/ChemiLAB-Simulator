@@ -1,6 +1,7 @@
 import { el } from '../shared/dom.js';
-import { kv } from '../shared/components/panel.js';
 import { val, isEmpty } from '../shared/format.js';
+import { icon } from '../shared/icons.js';
+
 /**
  * Guided tour runner. A step moves the camera, highlights the equipment,
  * explains the section — and puts the numbers that step is about in front of
@@ -49,14 +50,28 @@ export function createTour(steps, { view, store, flowsheet }) {
       if (!host) return;
       host.innerHTML = '';
       const s = steps[i];
+
       if (!s) {
-        host.appendChild(el('div', { class: 'fallback', text: 'Start the tour to walk through the process section by section.' }));
+        host.appendChild(el('div', { class: 'empty' }, [
+          el('div', { class: 'glyph', html: icon('book') }),
+          el('b', { text: 'Eight steps through the plant' }),
+          el('p', { text: 'Each one moves the camera to a section, says why it exists, and puts the numbers it is about on screen while you change things.' })
+        ]));
         return;
       }
+
+      // Progress as a row of ticks rather than "3 of 8": it says where you are
+      // and how much is left in the space a sentence would take.
+      const ticks = el('div', { class: 'tour-ticks' },
+        steps.map((_, k) => el('i', { dataset: { on: String(k <= i) } })));
+
       host.append(
-        el('div', { style: 'font-family:var(--mono);font-size:11px;color:var(--ink-faint)', text: `Step ${i + 1} of ${steps.length}` }),
-        el('strong', { text: s.title }),
-        el('p', { style: 'font-size:12.5px;color:var(--ink-dim)', text: s.text })
+        el('div', { class: 'tour-head' }, [
+          el('span', { class: 'tour-n', text: `Step ${i + 1} / ${steps.length}` }),
+          ticks
+        ]),
+        el('strong', { class: 'tour-title', text: s.title }),
+        el('p', { class: 'tour-text', text: s.text })
       );
 
       // The numbers this step is about, as they stand right now.
@@ -64,16 +79,25 @@ export function createTour(steps, { view, store, flowsheet }) {
       const watched = (s.watch || []).map(k => [k, lookup(result, k)]).filter(e => e[1]);
       if (watched.length) {
         host.append(
-          el('div', { style: 'font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);letter-spacing:.06em;text-transform:uppercase;margin:10px 0 2px', text: 'Watch while you change things' }),
-          el('div', {}, watched.map(e => kv(e[1].label || e[0],
-            isEmpty(e[1].value) ? '—' : val(e[1].value, e[1].unit, e[1].digits ?? 2))))
+          el('div', { class: 'sect', dataset: { accent: 'true' }, text: 'Watch while you change things' }),
+          el('div', { class: 'tour-watch' }, watched.map(([key, f]) => el('div', { class: 'kv' }, [
+            el('span', { class: 'k', text: f.label || key }),
+            el('span', {
+              class: `v ${isEmpty(f.value) ? 'empty' : ''}`,
+              text: isEmpty(f.value) ? '—' : val(f.value, f.unit, f.digits ?? 2)
+            })
+          ])))
         );
       }
 
-      host.append(el('div', { class: 'btnrow', style: 'margin-top:10px' }, [
-        el('button', { class: 'btn', text: 'Back', disabled: i === 0 || null, onClick: () => { go(i - 1); onChange?.(); } }),
+      host.append(el('div', { class: 'btnrow', style: 'margin-top:12px' }, [
         el('button', {
-          class: 'btn primary', text: i === steps.length - 1 ? 'Finish' : 'Next',
+          class: 'btn', text: 'Back', disabled: i === 0 || null,
+          onClick: () => { go(i - 1); onChange?.(); }
+        }),
+        el('button', {
+          class: 'btn primary',
+          html: i === steps.length - 1 ? 'Finish' : `Next ${icon('arrow')}`,
           onClick: () => { if (i === steps.length - 1) api.stop(); else go(i + 1); onChange?.(); }
         })
       ]));

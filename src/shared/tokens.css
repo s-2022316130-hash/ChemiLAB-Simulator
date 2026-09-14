@@ -1,0 +1,296 @@
+/* ===========================================================================
+   ChemiLAB — design tokens.
+
+   The single source of colour, elevation, shape, type and motion for the whole
+   application. Nothing outside this file names a raw colour: components use
+   semantic tokens, and shared/theme.js reads the same names when it has to hand
+   a colour to something that is not CSS — the 3D renderer, the caption plates,
+   the stream tracers. That is what keeps the plant and the interface the same
+   shade of the same colour instead of two palettes that drift apart.
+
+   DARK IS THE FOUNDATION. A control room is a dark room: instruments are read
+   as luminous marks on a deep ground, and that is the register this product
+   belongs to. The light theme is not an inversion of it — it is a second,
+   deliberately designed environment (a laboratory in daylight) with its own
+   contrast decisions, its own shadows and its own scene lighting.
+
+   Structure
+     1  ramp            the neutral scale both themes are built from
+     2  surfaces        four elevation levels, not one card colour
+     3  ink             four text weights
+     4  hue             the signature colour, overridden per simulator
+     5  function        status, provenance and stream-phase colours
+     6  scene           what the 3D renderer reads
+     7  form            radius, spacing, type, shadow, motion
+   =========================================================================== */
+
+:root{
+  color-scheme:dark;
+
+  /* --- 1  neutral ramp -----------------------------------------------------
+     Cool and slightly navy rather than neutral grey: a graphite with blue in it
+     reads as instrumentation, and it lets a warm status colour sit on it
+     without turning muddy. 950 is the deepest, 050 the lightest. */
+  --n-990:#05080e;
+  --n-975:#080c13;
+  --n-950:#0b101a;
+  --n-925:#0e141f;
+  --n-900:#121927;
+  --n-850:#161e2d;
+  --n-800:#1b2433;
+  --n-750:#212b3c;
+  --n-700:#293448;
+  --n-600:#35425a;
+  --n-500:#4a5a76;
+  --n-400:#6b7c99;
+  --n-300:#8e9cb5;
+  --n-200:#b3bfd2;
+  --n-150:#ccd5e3;
+  --n-100:#dfe6f0;
+  --n-050:#eef2f8;
+  --n-000:#ffffff;
+
+  /* --- 2  surfaces ---------------------------------------------------------
+     Four levels, because "a card" is not one thing: the page, a panel, a well
+     inset into a panel, and something floating above both need to be
+     distinguishable without a border doing all the work. */
+  --bg-0:var(--n-950);        /* the page itself */
+  --bg-1:var(--n-900);        /* a panel */
+  --bg-2:var(--n-850);        /* a well inset into a panel */
+  --bg-3:var(--n-800);        /* a raised control inside a well */
+  --bg-lift:var(--n-750);     /* hover of a raised control */
+  --surface:var(--n-900);
+  --surface-2:var(--n-850);
+  --surface-raised:var(--n-850);
+  --surface-glass:rgba(14,20,31,.78);
+  --surface-veil:rgba(8,12,19,.62);
+
+  --line:#222d3f;
+  --line-soft:#1a2331;
+  --line-strong:#33415a;
+  --line-bright:#465878;
+
+  /* --- 3  ink --------------------------------------------------------------
+     Four weights. Headline, body, supporting, and the faint weight that labels
+     a value without competing with it. */
+  --ink:#eaf0f8;
+  --ink-dim:#a7b4c9;
+  --ink-faint:#6f7f9a;
+  --ink-ghost:#4e5c74;
+  --ink-invert:#080c13;
+
+  /* --- 4  signature hue ----------------------------------------------------
+     Four stops so a component picks the one with the contrast it needs rather
+     than dimming a single colour with opacity: the hue itself, a deeper one for
+     gradients, a soft one for text on a dark wash, and the wash. */
+  --hue:#26d0e0; --hue-deep:#0e7f92; --hue-soft:#8fe9f3; --hue-wash:#0c2a31;
+  --hue-glow:rgba(38,208,224,.30);
+  --accent:var(--hue); --accent-deep:var(--hue-deep);
+  --on-accent:#04141a;
+
+  /* --- 5  function ---------------------------------------------------------
+     Each state is its own hue and never a tint of the accent, so a warning is
+     a warning on the paint plant and on the gas plant alike. */
+  --ok:#3ddc97;      --ok-soft:#07281d;    --ok-line:#1a6b4d;
+  --warn:#ffb648;    --warn-soft:#2c1e06;  --warn-line:#7d5510;
+  --err:#ff6b81;     --err-soft:#2d0d16;   --err-line:#8a2438;
+  --calc:#7aa2ff;    --calc-soft:#0f1a35;  --calc-line:#2f4a8f;
+  --info:#4cc4f5;    --info-soft:#08222f;  --info-line:#1b5f7d;
+
+  /* Provenance of a number: where the value on screen came from. */
+  --kind-user:#ffb648; --kind-calc:#3ddc97; --kind-corr:#7aa2ff;
+  --kind-ref:#c59bff;  --kind-approx:#ff6b81;
+
+  /* Stream phases. Matched to PHASE_TOKEN in scene/streams.js, so a phase is
+     one colour in the diagram, in the plant and in the legend. */
+  --stream-liq:#43b4f5;  --stream-liquid:#43b4f5;
+  --stream-gas:#b388fb;  --stream-steam:#c3d0e2;
+  --stream-air:#3ad6c4;  --stream-solid:#ffb648; --stream-slurry:#c99266;
+
+  /* --- 6  scene ------------------------------------------------------------
+     Read by scene/env.js and scene/renderer.js at build and on every theme
+     change. A night plot: deep sky, cool ground, a warm key light and enough
+     bloom that a lamp reads as a light source rather than a bright dot. */
+  --scene-sky-top:#050810; --scene-sky-mid:#0c1524; --scene-sky-low:#1b2739;
+  --scene-ground:#1b212c; --scene-grid:#3c4e6b;
+  --scene-fog:#0b1220;
+  --scene-key:#fff0d6; --scene-fill:#8fb6e4; --scene-amb-sky:#7ea4d4; --scene-amb-ground:#221d2b;
+  --scene-key-int:3.25; --scene-fill-int:.55; --scene-amb-int:.42; --scene-env-int:.72;
+  --scene-exposure:1.06; --scene-bloom:.58; --scene-bloom-threshold:.80;
+  --scene-contact:.46;                        /* strength of the contact pool */
+  --caption-bg:rgba(11,16,26,.90); --caption-ink:#eaf0f8; --caption-dim:#a7b4c9;
+  --caption-shadow:rgba(0,0,0,.62);
+
+  /* --- 7  form -------------------------------------------------------------
+     Radii are tight. A scientific instrument is drawn with corners, not with
+     pills, and a page of 18px rounding reads as a consumer app. */
+  --r-xl:14px; --r-lg:12px; --r:9px; --r-sm:6px; --r-xs:4px;
+  --pad:14px;
+  --gap:12px;
+
+  --font:"Inter","Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+
+  /* Type scale. Values in the interface are set in the mono face with tabular
+     figures throughout, so a column of readings lines up on the decimal. */
+  --t-display:clamp(34px,5.2vw,62px);
+  --t-h1:clamp(26px,3.4vw,38px);
+  --t-h2:21px; --t-h3:16.5px;
+  --t-body:13.5px; --t-small:12.5px; --t-fine:11.5px; --t-micro:10.5px;
+  --t-read:15px;            /* a value on a readout */
+  --t-read-lg:26px;         /* a headline value */
+
+  --shell-top:56px; --rail:360px; --panel-head:38px; --col-left:320px;
+
+  /* Elevation. Dark surfaces cannot rely on a drop shadow alone — a ring of
+     light along the top edge is what actually separates them — so every level
+     pairs a shadow with an inset highlight. */
+  --sh-1:0 1px 2px rgba(0,0,0,.42), 0 1px 3px rgba(0,0,0,.30);
+  --sh-2:0 2px 6px rgba(0,0,0,.42), 0 14px 32px -12px rgba(0,0,0,.70);
+  --sh-3:0 6px 14px rgba(0,0,0,.46), 0 34px 64px -18px rgba(0,0,0,.86);
+  --sh-4:0 10px 24px rgba(0,0,0,.50), 0 56px 100px -28px rgba(0,0,0,.92);
+  --edge:inset 0 1px 0 rgba(255,255,255,.055);
+  --edge-strong:inset 0 1px 0 rgba(255,255,255,.10);
+  --sh-glow:0 0 0 3px color-mix(in srgb, var(--hue) 22%, transparent);
+  --sh-hue:0 10px 30px -12px var(--hue-glow);
+
+  /* Atmosphere. A faint engineering grid over the page ground, and two very
+     wide colour fields that give the background depth without becoming a
+     gradient anyone notices. */
+  --grid-line:rgba(140,170,210,.045);
+  --grid-size:46px;
+  --veil-a:color-mix(in srgb, var(--hue) 14%, transparent);
+  --veil-b:color-mix(in srgb, #3f6fd8 9%, transparent);
+
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --ease-in-out:cubic-bezier(.65,0,.35,1);
+  --spring:cubic-bezier(.34,1.4,.64,1);
+  --dur-1:120ms; --dur-2:200ms; --dur-3:320ms; --dur-4:520ms;
+}
+
+/* ===========================================================================
+   LIGHT — a laboratory in daylight.
+
+   Not an inversion. Surfaces are near-white and separated by a real border
+   rather than by a shadow, ink runs darker than the dark theme's is light
+   (black on white needs more contrast than white on black to read as calm),
+   accents darken to hold against paper, and the 3D scene switches to an
+   overcast daylight rig rather than simply brightening the night one.
+   =========================================================================== */
+[data-theme="light"]{
+  color-scheme:light;
+
+  --n-990:#ffffff;
+  --n-975:#fdfeff;
+  --n-950:#f4f7fb;
+  --n-925:#eef2f8;
+  --n-900:#ffffff;
+  --n-850:#f5f8fc;
+  --n-800:#eaeff7;
+  --n-750:#dfe6f0;
+  --n-700:#ccd5e3;
+  --n-600:#b3bfd2;
+  --n-500:#8e9cb5;
+  --n-400:#6b7c99;
+  --n-300:#4a5a76;
+  --n-200:#35425a;
+  --n-150:#293448;
+  --n-100:#1b2433;
+  --n-050:#121927;
+  --n-000:#0b101a;
+
+  --bg-0:#f2f6fb;
+  --bg-1:#ffffff;
+  --bg-2:#f3f6fb;
+  --bg-3:#e9eff7;
+  --bg-lift:#dde5f0;
+  --surface:#ffffff;
+  --surface-2:#f7f9fd;
+  --surface-raised:#ffffff;
+  --surface-glass:rgba(255,255,255,.80);
+  --surface-veil:rgba(255,255,255,.55);
+
+  --line:#dae2ee;
+  --line-soft:#e8eef6;
+  --line-strong:#bfcbdd;
+  --line-bright:#9fb0c8;
+
+  --ink:#0d1421;
+  --ink-dim:#41506a;
+  --ink-faint:#657490;
+  --ink-ghost:#8b99b0;
+  --ink-invert:#ffffff;
+
+  --hue:#0b7d95; --hue-deep:#075567; --hue-soft:#b4ecf4; --hue-wash:#e6f8fb;
+  --hue-glow:rgba(11,125,149,.22);
+  --on-accent:#ffffff;
+
+  --ok:#0a7a53;   --ok-soft:#dcf5ea;  --ok-line:#9fdcc3;
+  --warn:#a35a06; --warn-soft:#fdefda; --warn-line:#e8c48a;
+  --err:#b4243c;  --err-soft:#fde7ec;  --err-line:#f0aab8;
+  --calc:#2f4fb3; --calc-soft:#e4eaff; --calc-line:#adbdf0;
+  --info:#0a6a94; --info-soft:#dff2fc; --info-line:#a2d6ee;
+
+  --kind-user:#a35a06; --kind-calc:#0a7a53; --kind-corr:#2f4fb3;
+  --kind-ref:#6d2bb0;  --kind-approx:#b4243c;
+
+  --stream-liq:#0b76c4; --stream-liquid:#0b76c4;
+  --stream-gas:#7b3fd4; --stream-steam:#5b6b82;
+  --stream-air:#0a8f83; --stream-solid:#b06a09; --stream-slurry:#8a6038;
+
+  /* Overcast daylight: a high soft key, a bright sky bounce, almost no bloom.
+     Bloom on a white page is haze, not light. */
+  --scene-sky-top:#6f93bd; --scene-sky-mid:#b6cde8; --scene-sky-low:#e4ddcd;
+  --scene-ground:#aab0bc; --scene-grid:#7d8798;
+  --scene-fog:#ccd9e9;
+  --scene-key:#fff6e6; --scene-fill:#bcd4ef; --scene-amb-sky:#c9dcf4; --scene-amb-ground:#9c978c;
+  --scene-key-int:3.45; --scene-fill-int:.34; --scene-amb-int:.32; --scene-env-int:.62;
+  --scene-exposure:.95; --scene-bloom:.16; --scene-bloom-threshold:1.0;
+  --scene-contact:.30;
+  --caption-bg:rgba(255,255,255,.95); --caption-ink:#0d1421; --caption-dim:#41506a;
+  --caption-shadow:rgba(13,20,33,.20);
+
+  --sh-1:0 1px 2px rgba(16,28,48,.06), 0 1px 3px rgba(16,28,48,.05);
+  --sh-2:0 2px 5px rgba(16,28,48,.06), 0 10px 24px -8px rgba(16,28,48,.14);
+  --sh-3:0 5px 12px rgba(16,28,48,.08), 0 26px 50px -14px rgba(16,28,48,.20);
+  --sh-4:0 8px 20px rgba(16,28,48,.09), 0 44px 80px -22px rgba(16,28,48,.26);
+  --edge:inset 0 1px 0 rgba(255,255,255,.9);
+  --edge-strong:inset 0 1px 0 rgba(255,255,255,1);
+
+  --grid-line:rgba(40,70,110,.055);
+  --veil-a:color-mix(in srgb, var(--hue) 10%, transparent);
+  --veil-b:color-mix(in srgb, #3f6fd8 7%, transparent);
+}
+
+/* ===========================================================================
+   SIGNATURE HUES — one per simulator.
+
+   Each unit is its own visual world and still belongs to ChemiLAB: the hue
+   changes, the system around it does not. Values are picked so that the five
+   are distinguishable at a glance and none of them collides with the status
+   palette — a green plant must not make a running lamp invisible, which is why
+   the fertilizer green is pushed towards emerald and the ok green towards mint.
+   =========================================================================== */
+[data-sim="water-treatment"]{   --hue:#4c9ffe; --hue-deep:#1257b8; --hue-soft:#bcdcff; --hue-wash:#0b1e3a; --hue-glow:rgba(76,159,254,.30); }
+[data-sim="industrial-dryer"]{  --hue:#ff9a3c; --hue-deep:#b35410; --hue-soft:#ffd8b0; --hue-wash:#2c1a08; --hue-glow:rgba(255,154,60,.30); }
+[data-sim="fertilizer"]{        --hue:#3ddc97; --hue-deep:#10805a; --hue-soft:#b3f2d7; --hue-wash:#07271c; --hue-glow:rgba(61,220,151,.28); }
+[data-sim="paint"]{             --hue:#ff5fa2; --hue-deep:#b01560; --hue-soft:#ffc4dd; --hue-wash:#2d0a1c; --hue-glow:rgba(255,95,162,.30); }
+[data-sim="gas-processing"]{    --hue:#9b7dfb; --hue-deep:#5b34c6; --hue-soft:#d8caff; --hue-wash:#1b1338; --hue-glow:rgba(155,125,251,.30); }
+
+[data-theme="light"][data-sim="water-treatment"]{  --hue:#1263c4; --hue-deep:#0b4287; --hue-soft:#c4ddfa; --hue-wash:#e9f2fd; --hue-glow:rgba(18,99,196,.22); }
+[data-theme="light"][data-sim="industrial-dryer"]{ --hue:#bb500b; --hue-deep:#7f3406; --hue-soft:#fbd9b6; --hue-wash:#fdf1e6; --hue-glow:rgba(187,80,11,.22); }
+[data-theme="light"][data-sim="fertilizer"]{       --hue:#0a7a53; --hue-deep:#065239; --hue-soft:#b3e6d0; --hue-wash:#e7f7f0; --hue-glow:rgba(10,122,83,.22); }
+[data-theme="light"][data-sim="paint"]{            --hue:#b81a63; --hue-deep:#7d0f43; --hue-soft:#f8c3da; --hue-wash:#fdeaf3; --hue-glow:rgba(184,26,99,.22); }
+[data-theme="light"][data-sim="gas-processing"]{   --hue:#5b34c6; --hue-deep:#3d1f92; --hue-soft:#d5c8f7; --hue-wash:#f1ecfd; --hue-glow:rgba(91,52,198,.22); }
+
+/* Per-simulator atmosphere. Each unit gets its own very wide background field,
+   so entering a simulator reads as entering a different facility rather than
+   as the same page with a different accent. Kept below the threshold where
+   anyone would call it a gradient. */
+[data-sim]{ --veil-a:color-mix(in srgb, var(--hue) 17%, transparent); }
+[data-sim="industrial-dryer"]{ --veil-b:color-mix(in srgb, #d8480f 11%, transparent); }
+[data-sim="water-treatment"]{  --veil-b:color-mix(in srgb, #0e8fb8 11%, transparent); }
+[data-sim="fertilizer"]{       --veil-b:color-mix(in srgb, #0f8f7a 10%, transparent); }
+[data-sim="paint"]{            --veil-b:color-mix(in srgb, #7a2ad8 11%, transparent); }
+[data-sim="gas-processing"]{   --veil-b:color-mix(in srgb, #2f4ad0 12%, transparent); }

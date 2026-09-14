@@ -8,14 +8,20 @@ export function buildCase({ simulatorId, modelVersion, inputs, scenario, level, 
 export function listCases() {
   try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
 }
+// Storage is not always there to be written to: private browsing, a page opened
+// from file://, a full quota. An unguarded setItem throws and takes the click
+// handler down with it, so a failed write is reported rather than raised.
+function write(cases) {
+  try { localStorage.setItem(KEY, JSON.stringify(cases)); return true; }
+  catch { return false; }
+}
 export function saveCase(c, name) {
   const all = listCases();
   all.unshift({ id: `${c.simulator}-${Date.now()}`, name: name || `${c.simulator} ${c.timestamp}`, data: c });
-  localStorage.setItem(KEY, JSON.stringify(all.slice(0, 50)));
-  return all[0].id;
+  return write(all.slice(0, 50)) ? all[0].id : null;
 }
 export function deleteCase(id) {
-  localStorage.setItem(KEY, JSON.stringify(listCases().filter(c => c.id !== id)));
+  return write(listCases().filter(c => c.id !== id));
 }
 export function duplicateCase(id) {
   const src = listCases().find(c => c.id === id);
