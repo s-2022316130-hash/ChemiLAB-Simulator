@@ -15,7 +15,7 @@ export const SIMULATORS = [
     state: 'complete', load: () => import('../simulators/fertilizer/index.js') },
   { id: 'paint', number: '04', name: 'Paint Manufacturing Plant',
     tagline: 'Dispersion, milling, let-down, rheology and batch quality',
-    state: 'planned', load: () => import('../simulators/paint/index.js') },
+    state: 'complete', load: () => import('../simulators/paint/index.js') },
   { id: 'gas-processing', number: '05', name: 'Natural Gas Processing Plant',
     tagline: 'Separation, dehydration, sweetening, NGL recovery, sales-gas spec',
     state: 'planned', load: () => import('../simulators/gas-processing/index.js') }

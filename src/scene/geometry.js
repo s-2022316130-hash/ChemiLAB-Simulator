@@ -465,6 +465,56 @@ export function sphereTank({ d = 6, legs = 6, mat = MAT.vessel }) {
 }
 
 /**
+ * Sawtooth dispersion disc on its shaft — the Cowles blade. The whole thing is
+ * grouped as 'rotor' so a plant module can spin it at the speed the engine
+ * reports, and leave it still when it does not.
+ *
+ * The teeth alternate up and down, which is what throws material radially and
+ * draws it down the centre. It is the shape that makes the doughnut.
+ */
+export function sawtoothBlade({ d = .6, teeth = 16, shaft = 4, mat = MAT.steel }) {
+  const grp = new THREE.Group();
+  grp.name = 'rotor';
+  grp.add(g(new THREE.CylinderGeometry(.055, .055, shaft, 10), MAT.steelDark, [0, shaft / 2, 0]));
+  grp.add(g(new THREE.CylinderGeometry(d / 2, d / 2, .035, 40), mat));
+  grp.add(g(new THREE.CylinderGeometry(d * .14, d * .14, .07, 14), MAT.steelDark, [0, .05, 0]));
+  for (let i = 0; i < teeth; i++) {
+    const a = (i / teeth) * Math.PI * 2, up = i % 2 ? 1 : -1;
+    grp.add(g(new THREE.BoxGeometry(d * .13, .055, .085), mat,
+      [Math.cos(a) * d * .5, up * .045, Math.sin(a) * d * .5], [0, -a, up * .55]));
+  }
+  return grp;
+}
+
+/**
+ * A short belt conveyor with containers on it. The containers are grouped as
+ * 'load' so a plant module can move them along while the line is running.
+ */
+export function fillingConveyor({ l = 6, w = .8, h = 1, cans = 7, canR = .17, canH = .3 }) {
+  const grp = new THREE.Group();
+  grp.add(g(new THREE.BoxGeometry(l, .07, w), MAT.grating, [0, h, 0]));
+  [-w / 2, w / 2].forEach(z => grp.add(g(new THREE.BoxGeometry(l, .1, .05), MAT.frame, [0, h + .08, z])));
+  for (let x = -l / 2 + .4; x <= l / 2; x += 1.6) {
+    grp.add(g(new THREE.BoxGeometry(.09, h, .09), MAT.frame, [x, h / 2, -w / 2]));
+    grp.add(g(new THREE.BoxGeometry(.09, h, .09), MAT.frame, [x, h / 2, w / 2]));
+  }
+  const load = new THREE.Group();
+  load.name = 'load';
+  const canMat = MAT.product.clone();
+  for (let i = 0; i < cans; i++) {
+    const can = g(new THREE.CylinderGeometry(canR, canR, canH, 16), canMat,
+      [-l / 2 + (i + .5) * (l / cans), h + canH / 2 + .04, 0]);
+    // Each container moves on its own down the belt, so they must not be fused.
+    can.userData.noMerge = true;
+    load.add(can);
+  }
+  load.userData.span = l;
+  load.userData.step = l / cans;
+  grp.add(load);
+  return grp;
+}
+
+/**
  * Fuse the static meshes of a built assembly, one merged mesh per material.
  *
  * A plant composed honestly out of these primitives ends up with several
