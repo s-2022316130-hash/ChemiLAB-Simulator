@@ -10,7 +10,7 @@ import { svg, clear } from '../dom.js';
  * saturated thing in the frame. A chart in this rail is a supporting reading,
  * so it is drawn to be understood at a glance and not to be admired.
  */
-const PAD = { l: 38, r: 10, t: 12, b: 24 };
+const PAD = { l: 40, r: 12, t: 24, b: 26 };
 
 const fmtTick = v => {
   const a = Math.abs(v);
@@ -31,6 +31,11 @@ const empty = (root, w, h) => {
 
 /** Horizontal gridlines with their values, and a baseline along the bottom. */
 function grid(root, w, h, y0, y1, sy, lines = 3) {
+  // The left rule. Gridlines alone leave the plot floating; one vertical line
+  // is what makes the values read as measured against a scale.
+  root.appendChild(svg('path', {
+    d: `M${PAD.l} ${PAD.t} V${h - PAD.b}`, stroke: 'var(--line)', fill: 'none', 'stroke-width': 1
+  }));
   for (let i = 0; i <= lines; i++) {
     const v = y0 + (y1 - y0) * (i / lines);
     const y = sy(v);
@@ -92,7 +97,8 @@ export function lineChart({ series = [], width = 320, height = 160, xLabel = '',
     'font-family': 'var(--font)', 'text-anchor': 'middle', text: xLabel
   }));
   if (yLabel) root.appendChild(svg('text', {
-    x: 2, y: 9, fill: 'var(--ink-faint)', 'font-size': 9, 'font-family': 'var(--font)', text: yLabel
+    x: 2, y: 11, fill: 'var(--ink-ghost)', 'font-size': 9,
+    'font-family': 'var(--mono)', 'letter-spacing': '.06em', text: yLabel
   }));
   return root;
 }
@@ -101,19 +107,33 @@ export function barChart({ bars = [], width = 320, height = 160, unit = '' }) {
   const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, width: '100%', role: 'img' });
   if (!bars.length) return empty(root, width, height);
 
-  const max = Math.max(...bars.map(b => b.value), 0) || 1;
-  const sy = v => (height - PAD.b) - (v / max) * (height - PAD.t - PAD.b);
-  grid(root, width, height, 0, max, sy, 2);
+  // A negative bar is a real answer here — an expander recovers shaft power
+  // rather than consuming it — so the scale holds one and the bars grow from
+  // zero in whichever direction the value goes.
+  const max = Math.max(...bars.map(b => b.value), 0);
+  const min = Math.min(...bars.map(b => b.value), 0);
+  const range = (max - min) || 1;
+  const sy = v => (height - PAD.b) - ((v - min) / range) * (height - PAD.t - PAD.b);
+  grid(root, width, height, min, max, sy, 2);
+  const zero = sy(0);
 
-  const span = (width - PAD.l - PAD.r) / bars.length;
+  const pitch = (width - PAD.l - PAD.r) / bars.length;
   bars.forEach((b, i) => {
-    const x = PAD.l + i * span + span * 0.22;
-    const w = span * 0.56;
-    const y = sy(Math.max(b.value, 0));
-    root.appendChild(svg('rect', {
-      x: x.toFixed(1), y: y.toFixed(1), width: w.toFixed(1),
-      height: Math.max(height - PAD.b - y, 1).toFixed(1),
+    const x = PAD.l + i * pitch + pitch * 0.22;
+    const w = pitch * 0.56;
+    const top = Math.min(sy(b.value), zero);
+    const h = Math.max(Math.abs(sy(b.value) - zero), 1);
+    const rect = svg('rect', {
+      x: x.toFixed(1), y: top.toFixed(1), width: w.toFixed(1), height: h.toFixed(1),
       rx: 2, fill: b.color || 'var(--hue)', opacity: 0.85
+    });
+    rect.appendChild(svg('title', { text: `${b.label}: ${fmtTick(b.value)}${unit ? ' ' + unit : ''}` }));
+    root.appendChild(rect);
+    // Each bar carries its own value. A bar chart in an analysis tool that makes
+    // you measure against a gridline to read a number is a picture of data.
+    root.appendChild(svg('text', {
+      x: (x + w / 2).toFixed(1), y: (top - 5).toFixed(1), fill: 'var(--ink)', 'font-size': 9,
+      'font-family': 'var(--mono)', 'text-anchor': 'middle', text: fmtTick(b.value)
     }));
     root.appendChild(svg('text', {
       x: (x + w / 2).toFixed(1), y: height - 9, fill: 'var(--ink-faint)', 'font-size': 8.5,
@@ -121,7 +141,8 @@ export function barChart({ bars = [], width = 320, height = 160, unit = '' }) {
     }));
   });
   if (unit) root.appendChild(svg('text', {
-    x: 2, y: 9, fill: 'var(--ink-faint)', 'font-size': 9, 'font-family': 'var(--font)', text: unit
+    x: 2, y: 11, fill: 'var(--ink-ghost)', 'font-size': 9,
+    'font-family': 'var(--mono)', 'letter-spacing': '.06em', text: unit
   }));
   return root;
 }

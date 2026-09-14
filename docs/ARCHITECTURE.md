@@ -156,10 +156,17 @@ What keeps the frame cheap:
   draw calls, not triangles, are what an integrated GPU runs out of. Named meshes and
   named groups are left alone: that is how a plant module reaches the parts it drives.
 - **Shadows are static**, re-rendered on demand and every 0.4 s at full quality. The sun
-  does not move and neither does most of the plant. That interval is measured rather than
-  chosen: a shadow pass over a plant at 3072² costs a large fraction of a frame, and
-  moving it from 0.4 s to 0.25 s took the smoothed frame cost from 4 ms to 36 ms for the
-  same picture.
+  does not move and neither does most of the plant, so the interval only has to be short
+  enough for a turning agitator to cast something honest.
+
+**A caution about measuring any of this.** `frameWork()` deliberately measures the
+duration of the frame's own work rather than the interval between frames, because a
+throttled or occluded tab is handed frames slowly while each one is cheap. What it cannot
+separate is the GPU: when the browser is not presenting, WebGL calls return immediately
+and the same scene measures around 4 ms; when it is presenting, they block and it measures
+around 12. Both numbers are real and they are three times apart, so a before-and-after
+comparison is only meaningful if the presenting state is the same on both sides — forcing
+a repaint between readings is the way to hold it still.
 - **Captions are their own scene**, composited after post-processing. Text stays crisp,
   never picks up bloom, and compositing it does not mean walking the plant twice.
 - **Transparency is rationed.** It was half the frame budget on the reference machine

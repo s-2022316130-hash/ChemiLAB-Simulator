@@ -722,7 +722,7 @@ function buildResults(s, x, fx) {
 
   const charts = running ? [
     {
-      type: 'line', xLabel: 'Time in the drum, min', yLabel: 'Moisture, kg/kg',
+      type: 'line', title: 'The drying curve through the drum', xLabel: 'Time in the drum, min', yLabel: 'Moisture, kg/kg',
       series: [{
         points: Array.from({ length: 26 }, (_, i) => {
           const t = s.tau * i / 25;
@@ -731,7 +731,7 @@ function buildResults(s, x, fx) {
       }]
     },
     {
-      type: 'bar', unit: U.powerKW,
+      type: 'bar', title: 'Where the heat goes', unit: U.powerKW,
       bars: [
         { label: 'Evaporation', value: Math.max(s.evaporationDuty / 3600, 0) },
         { label: 'Solids', value: Math.max(s.solidsSensible / 3600, 0) },
@@ -740,7 +740,7 @@ function buildResults(s, x, fx) {
       ]
     },
     {
-      type: 'line', xLabel: 'Air flow, kg/h', yLabel: 'Residence time, min',
+      type: 'line', title: 'Residence time against air flow', xLabel: 'Air flow, kg/h', yLabel: 'Residence time, min',
       series: [{
         points: Array.from({ length: 21 }, (_, i) => {
           const g = inputSpec.airFlow.min + (Math.min(s.G * 2.5, inputSpec.airFlow.max) - inputSpec.airFlow.min) * i / 20;

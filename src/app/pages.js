@@ -5,6 +5,7 @@ import { invalidateTokens } from '../shared/theme.js';
 import { icon } from '../shared/icons.js';
 import { previewNode } from './previews.js';
 import { createHeroField } from './heroField.js';
+import { heroPlantNode } from './heroPlant.js';
 import { signature, AUTHOR } from '../shared/components/signature.js';
 
 /**
@@ -44,25 +45,28 @@ export function homePage(view) {
   const page = el('div', { class: 'home' }, [
     el('section', { class: 'hero' }, [
       field,
-      el('span', { class: 'eyebrow', text: 'Chemical engineering virtual plant' }),
-      el('h1', {}, [
-        document.createTextNode('Run the plant. Then find out '),
-        el('em', { text: 'why' }),
-        document.createTextNode(' it behaves that way.')
+      el('div', { class: 'hero-copy' }, [
+        el('span', { class: 'eyebrow', text: 'Chemical engineering virtual plant' }),
+        el('h1', {}, [
+          document.createTextNode('Run the plant. Then find out '),
+          el('em', { text: 'why' }),
+          document.createTextNode(' it behaves that way.')
+        ]),
+        el('p', { class: 'lede', text: 'Change an operating condition, solve the balances, and watch the same solved state appear in the 3D plant, the flowsheet, the results rail and the equations behind them. Not an animation of a process — a process model with a plant drawn on top of it.' }),
+        el('div', { class: 'cta' }, [
+          el('button', {
+            class: 'btn primary',
+            html: `Explore the simulators ${icon('arrow')}`,
+            onClick: () => goTo(gallery)
+          }),
+          el('button', {
+            class: 'btn',
+            html: `${icon('book')} How it works`,
+            onClick: () => goTo(how)
+          })
+        ])
       ]),
-      el('p', { class: 'lede', text: 'Change an operating condition, solve the balances, and watch the same solved state appear in the 3D plant, the flowsheet, the results rail and the equations behind them. Not an animation of a process — a process model with a plant drawn on top of it.' }),
-      el('div', { class: 'cta' }, [
-        el('button', {
-          class: 'btn primary',
-          html: `Explore the simulators ${icon('arrow')}`,
-          onClick: () => goTo(gallery)
-        }),
-        el('button', {
-          class: 'btn',
-          html: `${icon('book')} How it works`,
-          onClick: () => goTo(how)
-        })
-      ]),
+      el('div', { class: 'hero-art' }, [heroPlantNode()]),
       el('div', { class: 'herostats' }, [
         stat(TOTALS.simulators, 'Process units'),
         stat(TOTALS.units, 'Tagged equipment'),
@@ -85,6 +89,14 @@ export function homePage(view) {
 export function simulatorsPage(view) { return homePage(view); }
 
 /* --- pieces ---------------------------------------------------------------- */
+
+/** One counted fact on a gallery tile. */
+function meta(value, label) {
+  return el('span', { class: 'tmeta' }, [
+    el('b', { text: String(value) }),
+    el('span', { text: label })
+  ]);
+}
 
 function stat(value, label) {
   return el('div', {}, [el('b', { text: String(value) }), el('span', { text: label })]);
@@ -123,6 +135,12 @@ function simTile(s, i) {
       ])
     ]),
     el('small', { text: s.tagline }),
+    s.counts ? el('div', { class: 'tile-meta' }, [
+      meta(s.counts.units, 'tagged units'),
+      meta(s.counts.faults, 'faults'),
+      meta(s.counts.challenges, 'challenges'),
+      meta(s.counts.tourSteps, 'tour steps')
+    ]) : null,
     el('div', { class: 'tile-foot' }, [
       el('span', { class: 'pill', text: STATE_LABEL[s.state] }),
       ready ? el('span', { class: 'launch', html: `Launch simulator ${icon('arrow')}` }) : null

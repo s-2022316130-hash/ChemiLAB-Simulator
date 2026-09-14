@@ -122,7 +122,7 @@ function groundTextures(dark) {
   }
   c.globalAlpha = 1;
 
-  const joint = base.clone().lerp(new THREE.Color(0x000000), dark ? 0.45 : 0.26);
+  const joint = base.clone().lerp(new THREE.Color(0x000000), dark ? 0.34 : 0.22);
   c.strokeStyle = `#${joint.getHexString()}`;
   c.lineWidth = 3;
   c.strokeRect(1.5, 1.5, S - 3, S - 3);
@@ -201,7 +201,7 @@ function probeScene(hue, dark) {
     s.add(m);
   };
   // Key: small and hot in the dark, broad and soft in daylight.
-  panel(dark ? 20 : 34, dark ? 20 : 34, rgb('--scene-key', '#fff0d6'), dark ? 9 : 5.5, [26, 40, 20]);
+  panel(dark ? 18 : 32, dark ? 18 : 32, rgb('--scene-key', '#fff2dc'), dark ? 17 : 7, [26, 40, 20]);
   panel(46, 22, rgb('--scene-fill', '#8fb6e4'), dark ? 0.9 : 1.6, [-34, 20, -26]);
   // Enough hue to tint a polished vessel, not enough to paint the concrete.
   panel(30, 30, hue, dark ? 1.0 : 1.1, [-16, 12, 34]);
@@ -329,7 +329,9 @@ export function createEnvironment(scene, renderer, hue, { size = 330 } = {}) {
     groundMat.needsUpdate = true;
 
     grid.material.color.copy(rgb('--scene-grid', '#3c4e6b'));
-    grid.material.opacity = dark ? 0.24 : 0.30;
+    // The concrete already carries its slab joints, so this is a whisper on top
+    // of them rather than a second grid competing with the first.
+    grid.material.opacity = dark ? 0.10 : 0.16;
 
     // Atmosphere. The fog colour is the horizon colour, so distance reads as
     // depth rather than as a grey curtain drawn across the plot. It starts far

@@ -111,13 +111,19 @@
      Read by scene/env.js and scene/renderer.js at build and on every theme
      change. A night plot: deep sky, cool ground, a warm key light and enough
      bloom that a lamp reads as a light source rather than a bright dot. */
-  --scene-sky-top:#050810; --scene-sky-mid:#0c1524; --scene-sky-low:#1b2739;
-  --scene-ground:#1b212c; --scene-grid:#3c4e6b;
-  --scene-fog:#0b1220;
-  --scene-key:#fff0d6; --scene-fill:#8fb6e4; --scene-amb-sky:#7ea4d4; --scene-amb-ground:#221d2b;
-  --scene-key-int:3.25; --scene-fill-int:.55; --scene-amb-int:.42; --scene-env-int:.72;
-  --scene-exposure:1.06; --scene-bloom:.58; --scene-bloom-threshold:.80;
-  --scene-contact:.46;                        /* strength of the contact pool */
+  /* The ground is darker than the equipment on purpose. A plot lit from above
+     has bright steel standing on dark concrete, and getting that the wrong way
+     round is most of what makes a night scene read as flat. */
+  --scene-sky-top:#04070d; --scene-sky-mid:#0a1220; --scene-sky-low:#182336;
+  --scene-ground:#12161f; --scene-grid:#3a4c68;
+  --scene-fog:#080e1a;
+  --scene-key:#fff2dc; --scene-fill:#7ea8dc; --scene-amb-sky:#5f82b4; --scene-amb-ground:#1d1a24;
+  /* A hard key and very little ambient. Ambient light is what removes form:
+     every extra unit of it flattens the difference between the lit side of a
+     vessel and its shadow side, which is the only thing giving it shape. */
+  --scene-key-int:4.4; --scene-fill-int:.42; --scene-amb-int:.26; --scene-env-int:1.0;
+  --scene-exposure:1.0; --scene-bloom:.5; --scene-bloom-threshold:.86;
+  --scene-contact:.5;                         /* strength of the contact pool */
   --caption-bg:rgba(11,16,26,.90); --caption-ink:#eaf0f8; --caption-dim:#a7b4c9;
   --caption-shadow:rgba(0,0,0,.62);
 
@@ -133,7 +139,7 @@
 
   /* Type scale. Values in the interface are set in the mono face with tabular
      figures throughout, so a column of readings lines up on the decimal. */
-  --t-display:clamp(34px,5.2vw,62px);
+  --t-display:clamp(29px,3.8vw,48px);
   --t-h1:clamp(26px,3.4vw,38px);
   --t-h2:21px; --t-h3:16.5px;
   --t-body:13.5px; --t-small:12.5px; --t-fine:11.5px; --t-micro:10.5px;
@@ -242,12 +248,14 @@
   /* Overcast daylight: a high soft key, a bright sky bounce, almost no bloom.
      Bloom on a white page is haze, not light. */
   --scene-sky-top:#6f93bd; --scene-sky-mid:#b6cde8; --scene-sky-low:#e4ddcd;
-  --scene-ground:#aab0bc; --scene-grid:#7d8798;
-  --scene-fog:#ccd9e9;
+  /* Daylight concrete is mid-grey, and the equipment on it is brighter still.
+     The relationship is the same as at night; only the absolute level moves. */
+  --scene-ground:#9aa1ad; --scene-grid:#77818f;
+  --scene-fog:#c6d5e8;
   --scene-key:#fff6e6; --scene-fill:#bcd4ef; --scene-amb-sky:#c9dcf4; --scene-amb-ground:#9c978c;
-  --scene-key-int:3.45; --scene-fill-int:.34; --scene-amb-int:.32; --scene-env-int:.62;
-  --scene-exposure:.95; --scene-bloom:.16; --scene-bloom-threshold:1.0;
-  --scene-contact:.30;
+  --scene-key-int:3.8; --scene-fill-int:.30; --scene-amb-int:.26; --scene-env-int:.80;
+  --scene-exposure:.94; --scene-bloom:.14; --scene-bloom-threshold:1.0;
+  --scene-contact:.34;
   --caption-bg:rgba(255,255,255,.95); --caption-ink:#0d1421; --caption-dim:#41506a;
   --caption-shadow:rgba(13,20,33,.20);
 

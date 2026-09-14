@@ -60,6 +60,11 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
   container.appendChild(root);
 
   const nodeEls = new Map(), edgeEls = new Map();
+  // tag -> Set(edge id). Selecting a unit should leave the streams that run
+  // into and out of it lit while the rest of the diagram recedes; without this
+  // the selected column sits bright in the middle of its own dimmed pipework,
+  // which is the opposite of what "where is this" means.
+  const touching = new Map();
   // Set by the pan handlers below; read by the node click handlers above them.
   let panDistance = () => 0;
   const pos = Object.fromEntries(spec.nodes.map(n => [n.tag, [n.x, n.y]]));
@@ -146,7 +151,13 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
     });
     gLabels.appendChild(label);
 
-    edgeEls.set(e.id, { path, glow, flowPath, casing, label, arrows });
+    const group = [path, glow, flowPath, casing, label, ...arrows];
+    edgeEls.set(e.id, { path, glow, flowPath, casing, label, arrows, group });
+    for (const end of [e.from, e.to]) {
+      if (!end) continue;
+      if (!touching.has(end)) touching.set(end, new Set());
+      touching.get(end).add(e.id);
+    }
   }
 
   for (const n of spec.nodes) {
@@ -328,7 +339,13 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
     select(tag) {
       nodeEls.forEach((n, t) => n.g.classList.toggle('sel', t === tag));
       // Selecting dims the rest. "Where is this" is a question about the whole
-      // diagram, not only about the thing being pointed at.
+      // diagram, not only about the thing being pointed at — but the streams
+      // belonging to the selection are part of the answer, so they stay lit.
+      const own = tag ? (touching.get(tag) || new Set()) : null;
+      edgeEls.forEach((e, id) => {
+        const on = !tag || own.has(id);
+        for (const node of e.group) node.classList.toggle('fs-dim', !on);
+      });
       root.dataset.focus = String(!!tag);
       touched();
     },

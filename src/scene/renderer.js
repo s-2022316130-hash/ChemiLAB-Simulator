@@ -408,10 +408,12 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
     // turning parts of the plant still cast something honest.
     shadowClock += dt;
     if (shadowDue > 0) { renderer.shadowMap.needsUpdate = true; shadowDue--; shadowClock = 0; }
-    // 0.4 s, and that number is measured rather than chosen. A shadow pass over
-    // this plant at 3072² costs a large fraction of a frame; at 0.4 s the
-    // smoothed frame cost is 4 ms, and at 0.25 s it is 36 — the same picture,
-    // nine times the price. Turning parts still cast something honest.
+    // Two and a half refreshes a second. Fast enough that a turning agitator or
+    // a moving conveyor casts something honest, slow enough that most frames
+    // never pay for a shadow pass at all. Measured at 0.25 s and 0.4 s on the
+    // reference machine the difference was inside the noise, so the cheaper of
+    // the two is kept — there is no reason to do the same work more often for a
+    // picture nobody can tell apart.
     else if (gov.tier === 'high' && shadowClock > 0.4) { renderer.shadowMap.needsUpdate = true; shadowClock = 0; }
 
     if (usePost) composer.render(dt); else renderer.render(scene, camera);

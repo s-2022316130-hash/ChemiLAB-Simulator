@@ -79,10 +79,7 @@ export function createResults(engine, store) {
       balanceSection('Mass balance', r.massBalance),
       balanceSection('Energy balance', r.energyBalance),
       section('Quality against specification', r.quality),
-      r.charts?.length ? collapsible('Trends and profiles',
-        r.charts.map(c => el('div', { style: 'margin:6px 0 14px' }, [
-          c.type === 'bar' ? barChart(c) : c.type === 'gauge' ? gauge(c) : lineChart(c)
-        ]))) : null,
+      r.charts?.length ? collapsible('Trends and profiles', r.charts.map(chartBlock)) : null,
       solverSection(r),
       r.steps?.length ? collapsible('Show the calculation', r.steps.map(stepBlock)) : null
     );
@@ -201,6 +198,20 @@ function errorState(result) {
     el('b', { text: 'No valid solution' }),
     el('p', { text: result?.reason || 'The last calculation did not produce a valid solution. The previous result has been cleared rather than left on screen — fix the inputs above and run again.' })
   ]);
+}
+
+/**
+ * A chart with the caption the engine gave it. Every chart spec carries a
+ * `title` saying what it is a chart of, and until now the rail threw it away —
+ * three unlabelled plots stacked in a column is a decoration, not an analysis.
+ */
+function chartBlock(c) {
+  const body = c.type === 'bar' ? barChart(c) : c.type === 'gauge' ? gauge(c) : lineChart(c);
+  return el('figure', { class: 'chart' }, [
+    c.title ? el('figcaption', { text: c.title }) : null,
+    body,
+    c.note ? el('p', { class: 'chart-note', text: c.note }) : null
+  ].filter(Boolean));
 }
 
 function stepBlock(s) {
