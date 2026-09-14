@@ -700,7 +700,7 @@ function buildResults(s, x, fx) {
 
   const charts = running ? [
     {
-      type: 'bar', unit: U.turbidity,
+      type: 'bar', title: 'Turbidity through the works', unit: U.turbidity,
       bars: [
         { label: 'Raw', value: s.turbidityPlant },
         { label: 'Settled', value: s.turbiditySettled },
@@ -709,7 +709,7 @@ function buildResults(s, x, fx) {
       ]
     },
     {
-      type: 'line', xLabel: 'Run time, h', yLabel: 'Headloss, m',
+      type: 'line', title: 'Filter headloss over the run', xLabel: 'Run time, h', yLabel: 'Headloss, m',
       series: s.runLength ? [{
         points: Array.from({ length: 11 }, (_, i) => {
           const t = s.runLength * i / 10;
@@ -718,7 +718,7 @@ function buildResults(s, x, fx) {
       }] : []
     },
     {
-      type: 'line', xLabel: 'Overflow rate, m/h', yLabel: 'Removal, %',
+      type: 'line', title: 'Settled-water removal against overflow rate', xLabel: 'Overflow rate, m/h', yLabel: 'Removal, %',
       series: [{
         points: Array.from({ length: 19 }, (_, i) => {
           const vo = 0.4 + i * 0.2;

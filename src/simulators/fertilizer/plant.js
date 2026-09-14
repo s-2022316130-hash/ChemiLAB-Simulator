@@ -14,6 +14,7 @@
  * prilling tower that dominates the skyline at the east end.
  */
 import * as THREE from 'three';
+import { resolvePresets } from '../../scene/cameras.js';
 import {
   compressorTrain, sphereTank, column, verticalVessel, horizontalVessel, tank,
   hopperVessel, shellTubeExchanger, pipe, valve, platform, stairs, frame,
@@ -58,18 +59,20 @@ const DIM = {
 };
 
 // ---------------------------------------------------------------------------
-// Camera presets. The ids are fixed by scene/cameras.js PRESET_ORDER.
+// Camera presets — what each one looks at, and from which bearing.
 // ---------------------------------------------------------------------------
-// Sight lines checked against the plot plan: the prilling tower is nearly 60 m
-// tall, so the overview stands well back and high enough to keep it in frame.
+// The prilling tower is sixty-four metres tall, which is why the overview used
+// to crop: one hand-typed distance could not frame the ammonia loop and also
+// contain the tower. Distances are now solved from the bounding box of the tags
+// named here, so the overview contains whatever the plot actually holds.
 const PRESETS = {
-  overview: { pos: [52, 40, 64], target: [10, 15, 0] },
-  feed: { pos: [-42, 14, 16], target: [-30, 4, -2] },
-  main: { pos: [-22, 18, 24], target: [-16, 7, 0] },
-  separation: { pos: [-2, 14, 20], target: [-5, 5, 0] },
-  utilities: { pos: [22, 16, 24], target: [17, 6, 4] },
-  products: { pos: [70, 48, 62], target: [37, 28, 0] },
-  control: { pos: [30, 8, -4], target: [26, 2, -11] }
+  overview: { subject: '*', azimuth: 40, elevation: 15, fill: 0.88, aim: 0.46 },
+  feed: { subject: [TAGS.makeupComp, TAGS.recycleComp], azimuth: -34, elevation: 24, fill: 0.76 },
+  main: { subject: [TAGS.converter, TAGS.wasteHeatBoiler], azimuth: 24, elevation: 20, fill: 0.9, aim: 0.44 },
+  separation: { subject: [TAGS.separator, TAGS.chiller, TAGS.purgeRecovery, TAGS.ammoniaStorage], azimuth: 152, elevation: 24, fill: 0.84 },
+  utilities: { label: 'Urea synthesis', subject: [TAGS.co2Comp, TAGS.ureaReactor, TAGS.stripper, TAGS.carbamateCondenser], azimuth: 24, elevation: 24, fill: 0.82 },
+  products: { subject: [TAGS.evaporator, TAGS.prillTower, TAGS.productBin], azimuth: 44, elevation: 14, fill: 0.9, aim: 0.48 },
+  control: { subject: [TAGS.mcc], azimuth: 160, elevation: 24, fill: 0.62 }
 };
 
 // The framework calls applyState on the module rather than on the built plant,
@@ -397,7 +400,7 @@ export function build(view, streams) {
   });
 
   live = refs;
-  return { presets: PRESETS, refs };
+  return { presets: resolvePresets(view, PRESETS), refs };
 }
 
 /** High-level pipe rack running the length of the plot. */
@@ -547,4 +550,4 @@ export function applyState(equipment = {}, streams = []) {
   }
 }
 
-export default { build, applyState, presets: PRESETS, layout: L };
+export default { build, applyState, presetSpec: PRESETS, layout: L };

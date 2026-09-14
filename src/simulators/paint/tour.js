@@ -15,7 +15,7 @@ export const TOUR = [
     id: 'overview',
     title: 'A batch, not a flow',
     text: 'Nothing here runs at steady state. A charge is made up, work is put into it for a while, it is thinned to its final recipe, and what comes out is judged against a specification. That changes what the questions are. There is no operating point to settle at, only a sequence of decisions, and the one that matters most was taken before anything was weighed out — because almost every property of the dried film is set by the ratio of pigment to binder in it. Watch Λ as you change the formulation: it is the number this whole plant exists to hit.',
-    preset: [[34, 22, 34], [2, 3, 0]],
+    preset: 'overview',
     watch: ['lambda', 'cpvc', 'fineness', 'gloss', 'contrastRatio', 'voc']
   },
   {

@@ -196,7 +196,7 @@ export function mediaBed({ w = 3, l = 3, h = 1.1, mat = MAT.steelDark }) {
  */
 export function statusLamp({ r = .18 } = {}) {
   const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), new THREE.MeshStandardMaterial({
-    color: STATE_COLOR.idle, emissive: STATE_COLOR.idle, emissiveIntensity: 1.6, roughness: .28,
+    color: STATE_COLOR.idle, emissive: STATE_COLOR.idle, emissiveIntensity: 1.1, roughness: .28,
     toneMapped: false
   }));
   m.name = 'lamp'; m.castShadow = false;
@@ -206,13 +206,13 @@ export function statusLamp({ r = .18 } = {}) {
   // shade of its housing.
   const halo = new THREE.Sprite(new THREE.SpriteMaterial({
     map: haloTexture(), color: STATE_COLOR.idle, transparent: true,
-    blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false, opacity: .7
+    blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false, opacity: .48
   }));
-  halo.scale.setScalar(r * 7);
+  halo.scale.setScalar(r * 5.5);
   halo.name = 'halo';
   m.add(halo);
   m.userData.halo = halo;
-  m.userData.base = 0.7;
+  m.userData.base = 0.48;
   return m;
 }
 
@@ -225,9 +225,9 @@ export function setLampState(lamp, colour, { on = true, alarm = false } = {}) {
   if (!lamp?.material) return;
   lamp.material.color.setHex(colour);
   lamp.material.emissive.setHex(colour);
-  lamp.material.emissiveIntensity = on ? 1.9 : 0.5;
+  lamp.material.emissiveIntensity = on ? 1.3 : 0.4;
   lamp.userData.alarm = !!alarm;
-  lamp.userData.base = on ? 0.8 : 0.25;
+  lamp.userData.base = on ? 0.52 : 0.18;
   const halo = lamp.userData.halo;
   if (halo) { halo.material.color.setHex(colour); halo.material.opacity = lamp.userData.base; }
 }

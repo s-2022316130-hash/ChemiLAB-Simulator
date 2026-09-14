@@ -48,6 +48,8 @@ For every simulator, without a browser:
 - the full engine contract is implemented, the base case converges, and the equipment and
   stream state cover every tag and every stream;
 - no calculated field leaks a value before a run, and no challenge grades an empty result;
+- the tagged-unit, fault, challenge and tour-step counts the overview page shows still
+  match what each simulator actually has;
 - the neighbourhood of the base case — every input at ±20 % and ±40 % — still solves;
 - twenty thousand random operating points per engine throw nothing, report no non-finite
   value, and never report a result without convergence.
@@ -79,11 +81,17 @@ Pass `FUZZ=200000` for a longer run, or a simulator id to check one:
 - **Scenarios** — base, normal, optimisation and fault modes, six faults per unit with the
   symptoms an operator would actually see, and graded challenges.
 - **Cases** — save, load, duplicate and export as JSON, with a model-version check.
-- **Themes** — light by default, dark as a deliberate choice, remembered per browser. The
-  plant is lit by the same design tokens as the interface, so the two cannot drift apart.
-- **Phones** — below 900 px the workspace becomes four tabbed screens with the run button
-  pinned, the flowsheet pans and zooms, and the renderer caps its pixel ratio and starts a
-  tier down. A flowsheet-only mode covers machines with no WebGL at all.
+- **Engineering HUD** — selecting a unit pins a technical plate to the 3D view with its
+  tag, name, operating state and the readings the engine reported for it. The flowsheet
+  dims everything else at the same time, so "where is this" is answered by both views.
+- **Themes** — dark by default, because a control room is a dark room; light is a second,
+  deliberately designed environment rather than an inversion. The plant is lit by the same
+  design tokens as the interface, so the two cannot drift apart.
+- **Phones** — below 900 px the workspace becomes four screens with bottom navigation, a
+  floating run action and a bottom sheet for equipment detail; the flowsheet pans and
+  zooms, and the renderer caps its pixel ratio and starts a tier down. Between 901 and
+  1180 px the views take the full width with the controls and the results rail side by
+  side under them. A flowsheet-only mode covers machines with no WebGL at all.
 
 ## Layout
 
@@ -97,7 +105,8 @@ src/
   flowsheet/   ISA symbols, SVG flowsheet with pan, zoom and two-way selection
   information/ equipment cards, guided tour, assumptions, glossary
   ui/          controls, results, scenario panel, case bar, mode switch, workspace
-  shared/      units, formatting, validation, store, persistence, animation, theme
+  shared/      design tokens, units, formatting, validation, store, persistence,
+               animation, theme, icons
   simulators/  one folder per unit — physics never crosses between them
 scripts/       verification harness
 docs/          architecture notes and the Simulator 01 work list

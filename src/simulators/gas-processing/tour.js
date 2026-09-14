@@ -15,7 +15,7 @@ export const TOUR = [
     id: 'overview',
     title: 'A sequence of specifications',
     text: 'This plant is not a sequence of units, it is a sequence of numbers someone else wrote down. The pipeline will not take more than four parts per million of hydrogen sulphide, so there is an amine unit. It will not take water, because water and hydrocarbon make hydrates that block a line solid, so there is a glycol unit. It has a heating value band, and ethane is sometimes worth more as liquid than as fuel, so there is a cold section. Nothing here was built because it was interesting. Watch the specification count on the results rail: that is the only score this plant has.',
-    preset: [[52, 32, 54], [6, 6, 0]],
+    preset: 'overview',
     watch: ['salesH2S', 'salesCO2', 'waterOut', 'salesWobbe', 'recoveryC2']
   },
   {

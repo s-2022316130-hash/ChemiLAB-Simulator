@@ -3,6 +3,7 @@
  * Run with: npm run verify  — or  node scripts/verify.mjs [simulatorId]
  */
 import { gradeChallenge } from '../src/simulation/scenarios.js';
+import { SIMULATORS } from '../src/app/registry.js';
 import { validate as validateSpec } from '../src/shared/validation.js';
 
 const MODULES = {
@@ -47,6 +48,28 @@ for (const id of ids) {
   tour.every(s => !s.tag || tags.includes(s.tag)) ? ok('every tour step points at a real tag') : bad('tour steps with a bad tag');
   scenarios.faults.every(f => tags.includes(f.appliesTo)) ? ok('every fault points at a real tag') : bad('faults with a bad tag');
   scenarios.faults.every(f => engine.FAULT_IDS.includes(f.id)) ? ok('every fault is implemented') : bad('undeclared faults');
+
+  // --- registry ------------------------------------------------------------
+  // The overview counts tagged units, faults, challenges and tour steps across
+  // the whole library, and it does so from the registry rather than by loading
+  // five engines to ask them. That means the registry holds four numbers that
+  // could quietly stop being true, so they are checked here instead.
+  const entry = SIMULATORS.find(x => x.id === id);
+  if (!entry) bad('not in the registry');
+  else {
+    const actual = {
+      units: tags.length,
+      faults: scenarios.faults.length,
+      challenges: scenarios.challenges.length,
+      tourSteps: tour.length
+    };
+    const wrong = Object.entries(actual)
+      .filter(([k, v]) => (entry.counts?.[k] ?? null) !== v)
+      .map(([k, v]) => k + ' declared ' + (entry.counts?.[k] ?? '—') + ', actually ' + v);
+    wrong.length === 0
+      ? ok('registry counts match: ' + Object.entries(actual).map(e => e.join(' ')).join(', '))
+      : bad('registry counts out of date — ' + wrong.join('; '));
+  }
   // Flowsheet geometry.
   let close = 0;
   for (let i = 0; i < fs.nodes.length; i++) for (let j = i + 1; j < fs.nodes.length; j++) {

@@ -89,15 +89,20 @@ says what to change.
 to the status lifecycle and discards superseded runs with a token counter, so a slow run
 can never overwrite a newer one.
 
-## Colour
+## Design system
 
-`shared/theme.css` holds every colour in the application as a semantic token, and
-`shared/theme.js` is the only way anything outside CSS reads one. Nothing else names a
-hex. Three consequences:
+`shared/tokens.css` holds every colour, elevation, radius, type step and duration in
+the application as a semantic token. `shared/theme.css` spends them and introduces no
+hex of its own, and `shared/theme.js` is the only way anything outside CSS reads one.
+Four consequences:
 
-- **Light and dark are one design.** `data-theme` on `<html>` swaps the token values;
-  every component follows without knowing a theme exists. The choice is remembered per
-  browser and applied before first paint by an inline script in `index.html`.
+- **Dark is the foundation.** A control room is a dark room: an instrument is read as a
+  luminous mark on a deep ground. Light is a second, deliberately designed environment —
+  a laboratory in daylight — with its own contrast decisions, its own shadows and its own
+  scene lighting rig, rather than an inversion of the dark one. `data-theme` on `<html>`
+  swaps the token values; every component follows without knowing a theme exists. The
+  choice is remembered per browser and applied before first paint by an inline script in
+  `index.html`.
 - **The plant is lit by the same palette as the interface.** The `--scene-*` tokens —
   sky, ground, fog, light intensities, exposure, bloom strength — are read by
   `scene/env.js` at build and again on every theme change.
@@ -105,9 +110,58 @@ hex. Three consequences:
   CSS and by `scene/streams.js` through `token()`, so the plant and the diagram cannot
   drift apart.
 
-`data-sim` carries each simulator's signature hue, which tints the accent, the rails,
-the rim light and the sky. It is set before the workspace mounts, because the renderer
-reads it at construction.
+`data-sim` carries each simulator's signature hue — aquatic blue, amber, emerald,
+magenta, violet — which tints the accent, the rails, the page atmosphere, the rim light
+and the sky. It is set before the workspace mounts, because the renderer reads it at
+construction. Entering a simulator is meant to feel like entering a different facility
+while the system around it stays identical.
+
+## Layout
+
+Three column widths, one component language:
+
+| Width | Layout |
+|---|---|
+| above 1180 px | three columns — controls, views, results rail |
+| 901–1180 px | views full width, controls and rail side by side under them |
+| below 900 px | four screens, bottom navigation, floating run action, bottom sheet for equipment |
+
+The phone layout is a CSS decision driven by `data-active` attributes, so nothing is
+rebuilt when the window changes size and the WebGL context is never lost — a tab that
+unmounted the canvas would have to recompile every shader on the way back.
+
+## Camera presets
+
+A preset declares **what it looks at**, not where the camera stands:
+
+```js
+main: { subject: [TAGS.amineContactor, TAGS.amineRegenerator], azimuth: 26, elevation: 22, fill: 0.84 }
+```
+
+`scene/cameras.js` resolves that into a position once the plant is built, by taking the
+bounding box of those tags and solving for the distance at which it fills `fill` of the
+frame from that bearing — per box corner, taking the largest answer, rather than using a
+bounding sphere that would stand far too far back from a long low plot.
+
+Choosing a bearing is still a judgement (which side of a unit is worth seeing, and what is
+standing in the way) and stays with the plant module. How far back to stand is arithmetic
+and used to be done by eye: measured against the built geometry, every hand-typed overview
+cropped its own plot — fertilizer needed 191 % of the frame height, paint 218 % of the
+width. A preset can no longer go stale when the plot plan moves, and a preset whose
+subject is not in the scene is dropped rather than pointed at the ground.
+
+The panel shape the presets are composed for is **1.88** — measured (782 × 416 CSS pixels
+at a 1512-wide window), not assumed. It lives in `cameras.js` and `renderer.js` imports
+it, because the number that decides how a preset is framed and the number that decides
+when a viewport is too narrow have to be the same number.
+
+A perspective camera's field of view is vertical, so a phone held upright sees far less
+across than that panel. `renderer.js` corrects in two places: the field of view opens to
+64° (past which a column's verticals start to bow) and standing further back covers **most
+of** the rest — not all of it. Covering it completely keeps every metre of a hundred-metre
+plot on screen and delivers the plant as a small object in a large sky; covering 35 % of
+the shortfall crops a little off each end at a size worth looking at, and the view pans
+and pinches.
 
 ## Performance
 
@@ -129,8 +183,18 @@ What keeps the frame cheap:
   primitives arrives as several hundred small meshes — a staircase is one per tread — and
   draw calls, not triangles, are what an integrated GPU runs out of. Named meshes and
   named groups are left alone: that is how a plant module reaches the parts it drives.
-- **Shadows are static**, re-rendered on demand and a few times a second at full quality.
-  The sun does not move and neither does most of the plant.
+- **Shadows are static**, re-rendered on demand and every 0.4 s at full quality. The sun
+  does not move and neither does most of the plant, so the interval only has to be short
+  enough for a turning agitator to cast something honest.
+
+**A caution about measuring any of this.** `frameWork()` deliberately measures the
+duration of the frame's own work rather than the interval between frames, because a
+throttled or occluded tab is handed frames slowly while each one is cheap. What it cannot
+separate is the GPU: when the browser is not presenting, WebGL calls return immediately
+and the same scene measures around 4 ms; when it is presenting, they block and it measures
+around 12. Both numbers are real and they are three times apart, so a before-and-after
+comparison is only meaningful if the presenting state is the same on both sides — forcing
+a repaint between readings is the way to hold it still.
 - **Captions are their own scene**, composited after post-processing. Text stays crisp,
   never picks up bloom, and compositing it does not mean walking the plant twice.
 - **Transparency is rationed.** It was half the frame budget on the reference machine

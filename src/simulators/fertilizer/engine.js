@@ -659,7 +659,7 @@ function buildResults(s, x, fx) {
 
   const charts = running ? [
     {
-      type: 'line', xLabel: 'Converter temperature, °C', yLabel: 'Ammonia at outlet, %',
+      type: 'line', title: 'Ammonia at the converter outlet against temperature', xLabel: 'Converter temperature, °C', yLabel: 'Ammonia at outlet, %',
       series: [{
         points: Array.from({ length: 21 }, (_, i) => {
           const T = 340 + i * 10;
@@ -677,7 +677,7 @@ function buildResults(s, x, fx) {
       }]
     },
     {
-      type: 'line', xLabel: 'Purge rate, %', yLabel: 'Inerts in loop, %',
+      type: 'line', title: 'Inerts in the loop against purge rate', xLabel: 'Purge rate, %', yLabel: 'Inerts in loop, %',
       series: [{
         points: Array.from({ length: 20 }, (_, i) => {
           const pf = 0.4 + i * 0.6;
@@ -686,7 +686,7 @@ function buildResults(s, x, fx) {
       }]
     },
     {
-      type: 'bar', unit: U.pct,
+      type: 'bar', title: 'Conversion per pass, overall, and recovery', unit: U.pct,
       bars: [
         { label: 'Per pass', value: Math.max(u.xPass * 100, 0) },
         { label: 'Overall', value: Math.max(u.xOverall * 100, 0) },

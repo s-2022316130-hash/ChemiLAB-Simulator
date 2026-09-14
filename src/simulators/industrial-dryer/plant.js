@@ -13,6 +13,7 @@
  * The air train runs on -Z into the drum and the gas cleaning plant on +Z.
  */
 import * as THREE from 'three';
+import { resolvePresets } from '../../scene/cameras.js';
 import {
   rotaryDrum, cyclone, hopperVessel, screwConveyor, tank, horizontalVessel,
   blower, pipe, valve, platform, stairs, frame, instrument, cabinet, statusLamp,
@@ -53,19 +54,20 @@ const DIM = {
 const drumTilt = -Math.atan(DIM.drum.slope);
 
 // ---------------------------------------------------------------------------
-// Camera presets. The ids are fixed by scene/cameras.js PRESET_ORDER.
+// Camera presets — what each one looks at, and from which bearing.
 // ---------------------------------------------------------------------------
-// Sight lines checked against the plot plan in the browser: the scene fog starts
-// at 55 m, so the overview sits inside it, and the gas cleaning train is viewed
-// from +Z because the drum stands in the way from the other side.
+// The drum runs along +X and stands in the way of almost everything, so the gas
+// cleaning train is viewed from +Z and the combustion air side from −Z. Camera
+// distances are solved from the tags named here by scene/cameras.js rather than
+// typed, so they cannot drift when the plot plan changes.
 const PRESETS = {
-  overview: { pos: [30, 24, 36], target: [3, 3, 0] },
-  feed: { pos: [-27, 10, 12], target: [-18, 2, 0] },
-  main: { pos: [-2, 13, 19], target: [0, 3, 0] },
-  separation: { pos: [15, 13, 22], target: [15, 4, 7.5] },
-  utilities: { pos: [-20, 9, -18], target: [-17, 2, -9] },
-  products: { pos: [28, 10, 15], target: [21, 2, 0] },
-  control: { pos: [24, 7, -3], target: [20, 2, -9.5] }
+  overview: { subject: '*', azimuth: 38, elevation: 25, fill: 0.84, aim: 0.4 },
+  feed: { subject: [TAGS.feedHopper, TAGS.feedScrew], azimuth: -40, elevation: 26, fill: 0.78 },
+  main: { subject: [TAGS.drum], azimuth: 22, elevation: 24, fill: 0.86 },
+  separation: { subject: [TAGS.cyclone, TAGS.bagFilter, TAGS.exhaustFan, TAGS.stack], azimuth: 36, elevation: 22, fill: 0.84 },
+  utilities: { label: 'Combustion air', subject: [TAGS.supplyFan, TAGS.heater], azimuth: 202, elevation: 24, fill: 0.78 },
+  products: { subject: [TAGS.productScrew, TAGS.cooler, TAGS.productBin], azimuth: 46, elevation: 25, fill: 0.82 },
+  control: { subject: [TAGS.mcc], azimuth: 158, elevation: 24, fill: 0.62 }
 };
 
 // The framework calls applyState on the module rather than on the built plant,
@@ -363,7 +365,7 @@ export function build(view, streams) {
   });
 
   live = refs;
-  return { presets: PRESETS, refs };
+  return { presets: resolvePresets(view, PRESETS), refs };
 }
 
 /** Service rack carrying the fuel and instrument runs across the plot. */
@@ -521,4 +523,4 @@ export function applyState(equipment = {}, streams = []) {
   }
 }
 
-export default { build, applyState, presets: PRESETS, layout: L };
+export default { build, applyState, presetSpec: PRESETS, layout: L };

@@ -6,6 +6,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { createEnvironment } from './env.js';
+import { REFERENCE_ASPECT, BASE_FOV } from './cameras.js';
 import { compact } from './geometry.js';
 import { makeLabel, updateLabel, selectionRing, CAPTION_DEFAULT } from './labels.js';
 import { highlight, setSceneTheme } from './materials.js';
@@ -58,7 +59,11 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   camera.position.set(30, 20, 30);
 
   const renderer = new THREE.WebGLRenderer({
-    antialias: true, powerPreference: 'high-performance', stencil: false
+    antialias: true, powerPreference: 'high-performance', stencil: false,
+    // The scene is composited through an HDR target, so the drawing buffer only
+    // ever holds the final tone-mapped image. Leaving it non-preserved lets the
+    // driver discard it rather than copy it every frame.
+    preserveDrawingBuffer: false
   });
   // A phone reports a pixel ratio of 3 and has a fraction of the fill rate to
   // pay for it. Rendering every one of those pixels buys nothing at arm's
@@ -84,24 +89,63 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
   if (touch) { controls.rotateSpeed = 0.55; controls.zoomSpeed = 1.1; }
   controls.minDistance = 6;
-  controls.maxDistance = 190;
+  // Far enough back to frame a long plant from a phone held upright, which is
+  // where fitFactor() can ask the camera to stand.
+  controls.maxDistance = 330;
   controls.target.set(0, 4, 0);
 
   const env = createEnvironment(scene, renderer, hue);
 
   /**
-   * How much further back a preset has to sit in this panel than in the wide
-   * one it was framed for. A perspective camera's field of view is vertical, so
-   * a tall narrow viewport sees far less across — which is exactly the shape a
-   * phone is. Without this the presets all open inside the plant.
+   * Framing a wide plant in a tall viewport.
+   *
+   * A perspective camera's field of view is vertical, so a phone held upright
+   * sees far less *across* than the landscape panel every camera preset was
+   * framed for — on a 375-wide screen that is a factor of five, and without a
+   * correction every preset opens inside the plant.
+   *
+   * The correction is made in two places because neither alone is enough.
+   * Widening the field of view is free and distortion-free up to a point; past
+   * about sixty-five degrees it starts to bow the verticals of a column, which
+   * on a process plant is the one thing that must stay straight. So the field
+   * of view opens as far as that limit and standing further back covers the
+   * rest, up to a cap — a little cropping at the ends of a long plant is a
+   * better trade than a plant too small to read, and the view pans.
    */
-  const REFERENCE_ASPECT = 1.55;
+  const MAX_FOV = 64;
+  const tanHalf = deg => Math.tan(deg * Math.PI / 360);
+  // The horizontal field of view the presets were composed for.
+  const H_REF = 2 * Math.atan(tanHalf(BASE_FOV) * REFERENCE_ASPECT);
+
+  /** The vertical field of view that would hold the reference width at this aspect. */
+  const neededFov = aspect =>
+    2 * Math.atan(Math.tan(H_REF / 2) / Math.max(aspect, 0.2)) * 180 / Math.PI;
+
+  function applyFov() {
+    const want = neededFov(camera.aspect || REFERENCE_ASPECT);
+    camera.fov = Math.min(Math.max(want, BASE_FOV), MAX_FOV);
+    camera.updateProjectionMatrix();
+  }
+
+  /**
+   * How much of the shortfall to cover by standing further back.
+   *
+   * Not all of it. Covering it completely keeps every metre of a hundred-metre
+   * plot on a phone screen, and the plant arrives as a small object in the
+   * middle of a large sky with nothing in the top and bottom thirds of the
+   * frame — technically the whole plant, practically unreadable. Covering most
+   * of it crops a little off each end at a size worth looking at, and the view
+   * pans and pinches.
+   */
+  const FIT_SHARE = 0.35;
+
   const fitFactor = () => {
     const a = camera.aspect || REFERENCE_ASPECT;
-    // Capped short of a full correction: a little cropping at the ends of a
-    // long plant is a better trade than a plant too small to read, and the view
-    // pans.
-    return a >= REFERENCE_ASPECT ? 1 : Math.min(1.75, REFERENCE_ASPECT / Math.max(a, 0.3));
+    if (a >= REFERENCE_ASPECT) return 1;
+    const want = neededFov(a);
+    const used = Math.min(Math.max(want, BASE_FOV), MAX_FOV);
+    const full = tanHalf(want) / tanHalf(used);
+    return Math.min(2.6, 1 + (full - 1) * FIT_SHARE);
   };
   /** A preset position pulled back to frame the same thing in this panel. */
   function framed(pos, target) {
@@ -139,11 +183,18 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   });
   const composer = new EffectComposer(renderer, rt);
   const renderPass = new RenderPass(scene, camera);
-  const bloomPass = new UnrealBloomPass(new THREE.Vector2(512, 512), tokenNumber('--scene-bloom', 0.22), 0.5, 1.0);
+  // Threshold rather than strength decides whether bloom reads as light or as
+  // haze. At 1.0 only genuinely emissive things bloom — lamps, flame, stream
+  // tracers — which is what is wanted in daylight. At night it comes down so a
+  // hot specular on a vessel catches as well, and the radius stays tight: a
+  // wide radius is fog, not glow.
+  const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(512, 512),
+    tokenNumber('--scene-bloom', 0.6), 0.34, tokenNumber('--scene-bloom-threshold', 0.85));
   const outlinePass = new OutlinePass(new THREE.Vector2(512, 512), scene, camera);
-  outlinePass.edgeStrength = 3.2;
-  outlinePass.edgeGlow = 0.35;
-  outlinePass.edgeThickness = 1.4;
+  outlinePass.edgeStrength = 4.2;
+  outlinePass.edgeGlow = 0.22;
+  outlinePass.edgeThickness = 1.1;
   outlinePass.pulsePeriod = 0;
   outlinePass.visibleEdgeColor.copy(hue);
   outlinePass.hiddenEdgeColor.copy(hue).multiplyScalar(0.35);
@@ -167,9 +218,11 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
     const w = Math.max(container.clientWidth, 1), h = Math.max(container.clientHeight, 1);
     renderer.setSize(w, h, false);
     composer.setSize(w, h);
-    bloomPass.setSize(Math.round(w / 3), Math.round(h / 3));
+    // Half rather than a third: the bloom buffer decides how clean the glow is,
+    // and at a third the highlight on a lamp becomes a soft blob.
+    bloomPass.setSize(Math.max(Math.round(w / 2), 128), Math.max(Math.round(h / 2), 128));
     camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+    applyFov();
     refreshShadows();
   }
   const ro = new ResizeObserver(resize); ro.observe(container); resize();
@@ -257,7 +310,7 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
       usePost = true;
       renderer.setPixelRatio(dpr);
       bloomPass.enabled = true;
-      env.setShadowQuality(true, handheld ? 1024 : 2048);
+      env.setShadowQuality(true, handheld ? 1024 : 3072);
     } else if (tier === 'medium') {
       usePost = true;
       renderer.setPixelRatio(Math.min(dpr, 1.25));
@@ -289,7 +342,8 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
     hue.set(token('--hue', '#0e7490'));
     env.apply();
     renderer.toneMappingExposure = tokenNumber('--scene-exposure', 1);
-    bloomPass.strength = tokenNumber('--scene-bloom', 0.22);
+    bloomPass.strength = tokenNumber('--scene-bloom', 0.6);
+    bloomPass.threshold = tokenNumber('--scene-bloom-threshold', 0.85);
     outlinePass.visibleEdgeColor.copy(hue);
     outlinePass.hiddenEdgeColor.copy(hue).multiplyScalar(0.35);
     marker.traverse(o => { if (o.isMesh) o.material.color.copy(hue); });
@@ -366,6 +420,12 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
     // turning parts of the plant still cast something honest.
     shadowClock += dt;
     if (shadowDue > 0) { renderer.shadowMap.needsUpdate = true; shadowDue--; shadowClock = 0; }
+    // Two and a half refreshes a second. Fast enough that a turning agitator or
+    // a moving conveyor casts something honest, slow enough that most frames
+    // never pay for a shadow pass at all. Measured at 0.25 s and 0.4 s on the
+    // reference machine the difference was inside the noise, so the cheaper of
+    // the two is kept — there is no reason to do the same work more often for a
+    // picture nobody can tell apart.
     else if (gov.tier === 'high' && shadowClock > 0.4) { renderer.shadowMap.needsUpdate = true; shadowClock = 0; }
 
     if (usePost) composer.render(dt); else renderer.render(scene, camera);
