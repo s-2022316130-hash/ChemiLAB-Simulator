@@ -15,7 +15,7 @@ export const TOUR = [
     id: 'overview',
     title: 'A works is a series of barriers',
     text: 'Nothing here removes everything. Coagulation conditions the particles, flocculation grows them, sedimentation takes out the bulk, filtration catches what is left and disinfection deals with what no filter can. Each barrier is sized on the assumption that the one before it did its job, so a failure early on is never contained where it happens — it moves downstream and gets more expensive. Work through the plant in that order and watch how each stage hands its result to the next.',
-    preset: [[38, 30, 42], [3, 2, 0]],
+    preset: 'overview',
     watch: ['turbidityFiltered', 'giardiaTotal', 'recovery', 'runLength']
   },
   {

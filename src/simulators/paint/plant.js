@@ -16,6 +16,7 @@
  * mezzanine rather than a pipe rack.
  */
 import * as THREE from 'three';
+import { resolvePresets } from '../../scene/cameras.js';
 import {
   tank, verticalVessel, horizontalVessel, hopperVessel, centrifugalPump, blower,
   pipe, valve, platform, stairs, frame, instrument, cabinet, statusLamp, agitator,
@@ -57,16 +58,20 @@ const DIM = {
 };
 
 // ---------------------------------------------------------------------------
-// Camera presets. The ids are fixed by scene/cameras.js PRESET_ORDER.
+// Camera presets — what each one looks at, and from which bearing.
 // ---------------------------------------------------------------------------
+// A paint works is low and wide, so the overview is the one preset that has to
+// fit a long plot into a landscape panel; scene/cameras.js solves that from the
+// bounding box rather than from a typed distance. The dust collector and the
+// laboratory sit on −Z and are read from behind.
 const PRESETS = {
-  overview: { pos: [26, 21, 34], target: [2, 2, 0] },
-  feed: { pos: [-34, 12, 12], target: [-24, 3, -1] },
-  main: { pos: [-13, 10, 12], target: [-6, 3, 0] },
-  separation: { pos: [8, 8, 13], target: [8, 2, 0] },
-  utilities: { pos: [-10, 9, 20], target: [-8, 2, 11] },
-  products: { pos: [34, 9, 15], target: [27, 2, 0] },
-  control: { pos: [36, 8, -4], target: [31, 2, -11] }
+  overview: { subject: '*', azimuth: 36, elevation: 26, fill: 0.86, aim: 0.42 },
+  feed: { subject: [TAGS.resinTank, TAGS.solventTank, TAGS.additiveSkid, TAGS.bagDump], azimuth: -40, elevation: 26, fill: 0.8 },
+  main: { subject: [TAGS.disperser, TAGS.beadMill], azimuth: 26, elevation: 24, fill: 0.8 },
+  separation: { subject: [TAGS.bagDump, TAGS.dustCollector], azimuth: 196, elevation: 24, fill: 0.78 },
+  utilities: { subject: [TAGS.chiller, TAGS.mcc], azimuth: 12, elevation: 26, fill: 0.74 },
+  products: { subject: [TAGS.letdownTank, TAGS.transferPump, TAGS.filter, TAGS.fillingLine], azimuth: 44, elevation: 24, fill: 0.84 },
+  control: { subject: [TAGS.qualityLab], azimuth: 186, elevation: 24, fill: 0.66 }
 };
 
 // The framework calls applyState on the module rather than on the built plant,
@@ -452,7 +457,7 @@ export function build(view, streams) {
   });
 
   live = refs;
-  return { presets: PRESETS, refs };
+  return { presets: resolvePresets(view, PRESETS), refs };
 }
 
 /**
@@ -623,4 +628,4 @@ function readNumber(formatted) {
   return Number.isFinite(n) ? n : null;
 }
 
-export default { build, applyState, presets: PRESETS, layout: L };
+export default { build, applyState, presetSpec: PRESETS, layout: L };

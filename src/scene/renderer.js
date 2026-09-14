@@ -6,6 +6,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { createEnvironment } from './env.js';
+import { REFERENCE_ASPECT, BASE_FOV } from './cameras.js';
 import { compact } from './geometry.js';
 import { makeLabel, updateLabel, selectionRing, CAPTION_DEFAULT } from './labels.js';
 import { highlight, setSceneTheme } from './materials.js';
@@ -111,8 +112,6 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
    * rest, up to a cap — a little cropping at the ends of a long plant is a
    * better trade than a plant too small to read, and the view pans.
    */
-  const REFERENCE_ASPECT = 1.55;
-  const BASE_FOV = 45;
   const MAX_FOV = 64;
   const tanHalf = deg => Math.tan(deg * Math.PI / 360);
   // The horizontal field of view the presets were composed for.
@@ -128,12 +127,25 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
     camera.updateProjectionMatrix();
   }
 
+  /**
+   * How much of the shortfall to cover by standing further back.
+   *
+   * Not all of it. Covering it completely keeps every metre of a hundred-metre
+   * plot on a phone screen, and the plant arrives as a small object in the
+   * middle of a large sky with nothing in the top and bottom thirds of the
+   * frame — technically the whole plant, practically unreadable. Covering most
+   * of it crops a little off each end at a size worth looking at, and the view
+   * pans and pinches.
+   */
+  const FIT_SHARE = 0.35;
+
   const fitFactor = () => {
     const a = camera.aspect || REFERENCE_ASPECT;
     if (a >= REFERENCE_ASPECT) return 1;
     const want = neededFov(a);
     const used = Math.min(Math.max(want, BASE_FOV), MAX_FOV);
-    return Math.min(2.8, tanHalf(want) / tanHalf(used));
+    const full = tanHalf(want) / tanHalf(used);
+    return Math.min(2.6, 1 + (full - 1) * FIT_SHARE);
   };
   /** A preset position pulled back to frame the same thing in this panel. */
   function framed(pos, target) {

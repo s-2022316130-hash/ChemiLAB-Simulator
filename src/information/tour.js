@@ -8,6 +8,7 @@ import { icon } from '../shared/icons.js';
  * whoever is reading it, live.
  *
  * step = {id, title, text, tag?, preset?, watch:[resultKeys]}
+ *   preset is a preset id such as 'overview'; a [pos, target] pair still works.
  *
  * The watch list is the point of a step as much as the text is. A step about
  * the critical pigment volume concentration is not much use unless Λ is on the
@@ -15,14 +16,20 @@ import { icon } from '../shared/icons.js';
  * whenever a new result arrives and reads those keys straight out of it.
  * Anything the engine did not calculate shows an em dash, like everywhere else.
  */
-export function createTour(steps, { view, store, flowsheet }) {
+export function createTour(steps, { view, store, flowsheet, presets }) {
   let i = -1, host = null, onChange = null;
 
   function go(n) {
     i = Math.max(0, Math.min(n, steps.length - 1));
     const s = steps[i];
     if (s.tag) { store.set({ selection: s.tag }); view?.focus?.(s.tag); flowsheet?.select(s.tag); }
-    else if (s.preset) view?.flyTo?.(...s.preset);
+    else if (typeof s.preset === 'string') {
+      // A step that opens on the whole plant names the preset rather than
+      // carrying its own copy of the coordinates. The Overview button and the
+      // first step of the tour are the same shot, and now they cannot disagree.
+      const p = presets?.get?.(s.preset);
+      if (p) view?.flyTo?.(p.pos, p.target);
+    } else if (Array.isArray(s.preset)) view?.flyTo?.(...s.preset);
     store.set({ tourStep: i });
     return s;
   }

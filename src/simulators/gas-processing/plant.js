@@ -16,6 +16,7 @@
  * well clear of everything, which is why it is where it is.
  */
 import * as THREE from 'three';
+import { resolvePresets } from '../../scene/cameras.js';
 import {
   column, verticalVessel, horizontalVessel, tank, sphereTank, compressorTrain,
   shellTubeExchanger, centrifugalPump, pipe, valve, platform, stairs, frame,
@@ -62,16 +63,21 @@ const DIM = {
 };
 
 // ---------------------------------------------------------------------------
-// Camera presets. The ids are fixed by scene/cameras.js PRESET_ORDER.
+// Camera presets — what each one looks at, and from which bearing.
 // ---------------------------------------------------------------------------
+// The gas runs along +X in treating order, the regeneration loops sit on −Z
+// behind their contactors, and the flare stands well clear. Distances are
+// solved from the bounding box of the tags named here by scene/cameras.js: this
+// plot is a hundred metres end to end and forty tall, and no typed distance
+// framed both the treating towers and the cold section.
 const PRESETS = {
-  overview: { pos: [44, 34, 56], target: [2, 8, 0] },
-  feed: { pos: [-52, 16, 18], target: [-42, 4, 2] },
-  main: { pos: [-26, 20, 22], target: [-16, 8, -4] },
-  separation: { pos: [20, 20, 26], target: [18, 8, 0] },
-  utilities: { pos: [-4, 16, 24], target: [-6, 6, -8] },
-  products: { pos: [56, 18, 26], target: [46, 5, 2] },
-  control: { pos: [20, 12, 28], target: [14, 3, 15] }
+  overview: { subject: '*', azimuth: 38, elevation: 18, fill: 0.88, aim: 0.4 },
+  feed: { subject: [TAGS.inletSeparator, TAGS.stabiliser], azimuth: -36, elevation: 26, fill: 0.8 },
+  main: { subject: [TAGS.amineContactor, TAGS.amineRegenerator, TAGS.glycolContactor, TAGS.glycolRegenerator], azimuth: 26, elevation: 22, fill: 0.84 },
+  separation: { subject: [TAGS.coldBox, TAGS.expander, TAGS.coldSeparator, TAGS.demethaniser], azimuth: 34, elevation: 22, fill: 0.84 },
+  utilities: { subject: [TAGS.flare, TAGS.aminePump, TAGS.leanRichExchanger], azimuth: 176, elevation: 20, fill: 0.8 },
+  products: { subject: [TAGS.residueCompressor, TAGS.nglStorage], azimuth: 50, elevation: 24, fill: 0.82 },
+  control: { subject: [TAGS.mcc], azimuth: 16, elevation: 24, fill: 0.64 }
 };
 
 // The framework calls applyState on the module rather than on the built plant,
@@ -473,7 +479,7 @@ export function build(view, streams) {
   });
 
   live = refs;
-  return { presets: PRESETS, refs };
+  return { presets: resolvePresets(view, PRESETS), refs };
 }
 
 /** The main pipe rack, which on a gas plant runs the length of the process. */
@@ -641,4 +647,4 @@ function readNumber(formatted) {
   return Number.isFinite(n) ? n : null;
 }
 
-export default { build, applyState, presets: PRESETS, layout: L };
+export default { build, applyState, presetSpec: PRESETS, layout: L };

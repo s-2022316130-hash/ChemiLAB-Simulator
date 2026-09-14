@@ -338,7 +338,10 @@ export function createEnvironment(scene, renderer, hue, { size = 330 } = {}) {
     // enough back that the plant itself is never in it — fog over the subject
     // is exactly what "faded" looks like.
     const fogColour = rgb('--scene-fog', '#0b1220');
-    scene.fog = new THREE.Fog(fogColour, dark ? 130 : 110, dark ? 320 : 285);
+    // Far enough out that no overview looks through it. The largest plot here
+    // is framed from 135 m, and fog that starts before the subject does is the
+    // definition of a faded render.
+    scene.fog = new THREE.Fog(fogColour, dark ? 175 : 160, dark ? 470 : 430);
 
     hemi.color.copy(rgb('--scene-amb-sky', '#7ea4d4'));
     hemi.groundColor.copy(rgb('--scene-amb-ground', '#221d2b'));

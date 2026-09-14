@@ -15,7 +15,7 @@ export const TOUR = [
     id: 'overview',
     title: 'One lesson, told twice',
     text: 'This plant is two recycle loops in series, and they teach the same thing. In both, the reactor converts only a fraction of what passes through it, and in both that barely matters, because what does not react is recovered and sent round again. The overall conversion is set by the recovery, not by the reactor. What actually limits each loop is what has to be bled out of it: inerts on the ammonia side, water on the urea side. Hold that idea and the rest of the plant follows from it.',
-    preset: [[44, 42, 56], [6, 12, 0]],
+    preset: 'overview',
     watch: ['perPassN2', 'inertLoop', 'ureaPerPass', 'ureaOverall', 'nitrogen']
   },
   {

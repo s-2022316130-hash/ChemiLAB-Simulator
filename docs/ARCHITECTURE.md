@@ -130,10 +130,38 @@ The phone layout is a CSS decision driven by `data-active` attributes, so nothin
 rebuilt when the window changes size and the WebGL context is never lost — a tab that
 unmounted the canvas would have to recompile every shader on the way back.
 
+## Camera presets
+
+A preset declares **what it looks at**, not where the camera stands:
+
+```js
+main: { subject: [TAGS.amineContactor, TAGS.amineRegenerator], azimuth: 26, elevation: 22, fill: 0.84 }
+```
+
+`scene/cameras.js` resolves that into a position once the plant is built, by taking the
+bounding box of those tags and solving for the distance at which it fills `fill` of the
+frame from that bearing — per box corner, taking the largest answer, rather than using a
+bounding sphere that would stand far too far back from a long low plot.
+
+Choosing a bearing is still a judgement (which side of a unit is worth seeing, and what is
+standing in the way) and stays with the plant module. How far back to stand is arithmetic
+and used to be done by eye: measured against the built geometry, every hand-typed overview
+cropped its own plot — fertilizer needed 191 % of the frame height, paint 218 % of the
+width. A preset can no longer go stale when the plot plan moves, and a preset whose
+subject is not in the scene is dropped rather than pointed at the ground.
+
+The panel shape the presets are composed for is **1.88** — measured (782 × 416 CSS pixels
+at a 1512-wide window), not assumed. It lives in `cameras.js` and `renderer.js` imports
+it, because the number that decides how a preset is framed and the number that decides
+when a viewport is too narrow have to be the same number.
+
 A perspective camera's field of view is vertical, so a phone held upright sees far less
-across than the landscape panel the camera presets were framed for. `renderer.js`
-corrects in two places: the field of view opens to 64° (past which a column's verticals
-start to bow) and standing further back covers the rest, capped at 2.8×.
+across than that panel. `renderer.js` corrects in two places: the field of view opens to
+64° (past which a column's verticals start to bow) and standing further back covers **most
+of** the rest — not all of it. Covering it completely keeps every metre of a hundred-metre
+plot on screen and delivers the plant as a small object in a large sky; covering 35 % of
+the shortfall crops a little off each end at a size worth looking at, and the view pans
+and pinches.
 
 ## Performance
 

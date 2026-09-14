@@ -13,6 +13,7 @@
  * east. Cross-plant service and sludge runs sit on -Z, backwash utilities on +Z.
  */
 import * as THREE from 'three';
+import { resolvePresets } from '../../scene/cameras.js';
 import {
   basin, tank, agitator, mediaBed, centrifugalPump, blower, pipe, valve,
   platform, stairs, frame, instrument, cabinet, statusLamp, verticalVessel,
@@ -56,19 +57,22 @@ const DIM = {
 const edge = (tag, dim, side) => L[tag].x + (side === 'in' ? -dim.l / 2 : dim.l / 2);
 
 // ---------------------------------------------------------------------------
-// Camera presets. The ids are fixed by scene/cameras.js PRESET_ORDER.
+// Camera presets — what each one looks at, and from which bearing.
 // ---------------------------------------------------------------------------
-// Sight lines are checked against the plot plan: the scene fog starts at 55 m, so
-// the overview sits inside that, and the filter gallery is viewed from -Z because
-// the elevated backwash tank stands directly in the way on the +Z side.
+// The works runs west to east along +X. The filter gallery is viewed from −Z
+// because the elevated backwash tank stands directly in the way on the +Z side,
+// and the sludge and washwater basins are read from the north for the same
+// reason. Distances are not declared: scene/cameras.js solves them from the
+// bounding box of the tags named here, so a preset cannot go stale when the
+// plot plan moves.
 const PRESETS = {
-  overview: { pos: [33, 25, 37], target: [4, 2, 0] },
-  feed: { pos: [-31, 11, 14], target: [-21, 2, 1] },
-  main: { pos: [-10, 16, 22], target: [-6, 2, 0] },
-  separation: { pos: [13, 13, -19], target: [13.5, 2, 0] },
-  utilities: { pos: [21, 12, 22], target: [14, 3, 7] },
-  products: { pos: [33, 11, 16], target: [25, 2, 0] },
-  control: { pos: [31, 7, -2], target: [27, 2, -10] }
+  overview: { subject: '*', azimuth: 38, elevation: 25, fill: 0.84, aim: 0.4 },
+  feed: { subject: [TAGS.intakePump, TAGS.coagDosing, TAGS.rapidMix], azimuth: -48, elevation: 26, fill: 0.8 },
+  main: { subject: [TAGS.rapidMix, TAGS.floc, TAGS.clarifier], azimuth: 30, elevation: 30, fill: 0.82 },
+  separation: { subject: [TAGS.filters, TAGS.backwashTank, TAGS.backwashPump, TAGS.blower], azimuth: 158, elevation: 27, fill: 0.82 },
+  utilities: { subject: [TAGS.sludge, TAGS.washRecovery, TAGS.chlorineDosing], azimuth: 172, elevation: 28, fill: 0.8 },
+  products: { subject: [TAGS.contactTank, TAGS.clearwell, TAGS.highLiftPump], azimuth: 44, elevation: 26, fill: 0.82 },
+  control: { subject: [TAGS.mcc], azimuth: 150, elevation: 24, fill: 0.62 }
 };
 
 // The framework calls applyState on the module rather than on the built plant,
@@ -452,7 +456,7 @@ export function build(view, streams) {
   });
 
   live = refs;
-  return { presets: PRESETS, refs };
+  return { presets: resolvePresets(view, PRESETS), refs };
 }
 
 function withPos(obj, [x, y, z]) { obj.position.set(x, y, z); return obj; }
@@ -585,4 +589,4 @@ export function applyState(equipment = {}, streams = []) {
   }
 }
 
-export default { build, applyState, presets: PRESETS, layout: L };
+export default { build, applyState, presetSpec: PRESETS, layout: L };

@@ -224,7 +224,7 @@ export function mountWorkspace(root, sim) {
   }
 
   // ---- panels ---------------------------------------------------------
-  const tour = sim.tour?.length ? createTour(sim.tour, { view, store, flowsheet }) : null;
+  const tour = sim.tour?.length ? createTour(sim.tour, { view, store, flowsheet, presets }) : null;
   const tourStart = tour ? el('button', {
     class: 'btn ghost', style: 'padding:3px 9px;font-size:var(--t-fine)', text: 'Start',
     onClick: () => { tour.start(); tour.render(tourHost, () => tour.render(tourHost)); }

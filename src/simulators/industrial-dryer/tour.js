@@ -15,7 +15,7 @@ export const TOUR = [
     id: 'overview',
     title: 'Three things can limit a dryer',
     text: 'At any operating point this machine is short of one of three things: the heat the drum can transfer, the time the drum gives the solids, or the room the air has left to take up moisture. Each one calls for a different correction, and two of them call for opposite corrections, so guessing is expensive. The results rail names which one is binding on every run. Before you change anything, find out which it is — that single question is most of what this simulator is for.',
-    preset: [[30, 24, 36], [3, 3, 0]],
+    preset: 'overview',
     watch: ['moistureOut', 'residenceTime', 'timeNeeded', 'rhOut', 'thermalEfficiency']
   },
   {
