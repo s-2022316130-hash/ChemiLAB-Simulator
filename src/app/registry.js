@@ -18,7 +18,7 @@ export const SIMULATORS = [
     state: 'complete', load: () => import('../simulators/paint/index.js') },
   { id: 'gas-processing', number: '05', name: 'Natural Gas Processing Plant',
     tagline: 'Separation, dehydration, sweetening, NGL recovery, sales-gas spec',
-    state: 'planned', load: () => import('../simulators/gas-processing/index.js') }
+    state: 'complete', load: () => import('../simulators/gas-processing/index.js') }
 ];
 export const getSimulator = id => SIMULATORS.find(s => s.id === id) || null;
 export const STATE_LABEL = { complete: 'Complete', scaffold: 'Framework ready', planned: 'Planned' };
