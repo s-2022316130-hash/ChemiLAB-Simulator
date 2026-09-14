@@ -1212,7 +1212,7 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
    a night render laid on white at any opacity is a grey cloud — so on paper it
    is lifted and flattened into a pale steel image first, and then allowed to be
    present at nearly twice the opacity for the same visual weight. */
-[data-theme="light"] .simtile .tile-photo-img{filter:saturate(.55) contrast(1) brightness(1.02)}
+[data-theme="light"] .simtile .tile-photo-img{filter:saturate(.6) contrast(1.08) brightness(1)}
 
 /* Where each frame is cropped. The stills are 1600 × 700 and a tile shows a
    strip out of the middle of that, so this is choosing which part of the plant

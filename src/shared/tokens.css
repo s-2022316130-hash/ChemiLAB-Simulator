@@ -284,7 +284,7 @@
      bright scrim rather than a dark one — the dark theme's values applied here
      would put a grey cloud on a white card. The vignette is cool grey and
      barely there: a black vignette on paper reads as a printing fault. */
-  --photo:.22; --photo-hi:.36;
+  --photo:.26; --photo-hi:.4;
   --tile-scrim:rgba(248,251,254,.86);
   --tile-scrim-soft:rgba(248,251,254,.42);
   --tile-vignette:rgba(126,152,182,.26);
