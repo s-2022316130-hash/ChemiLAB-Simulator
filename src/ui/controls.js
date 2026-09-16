@@ -79,7 +79,20 @@ export function createControls(engine, store, { onRun } = {}) {
 
     let shown = 0;
     for (const [group, items] of groups) {
-      host.appendChild(el('div', { class: 'sect', text: group }));
+      // Each group folds away. At student level there are five inputs and this
+      // does nothing; at expert level there are twenty and being able to shut
+      // the three sections you are not working on is the difference between a
+      // panel and a wall. Open by default, always — a control you cannot see is
+      // a control you do not know exists.
+      const body = el('div', { class: 'ctrl-body' });
+      const g = el('details', { class: 'ctrl-group', open: true }, [
+        el('summary', {}, [
+          el('span', { class: 'ctrl-name', text: group }),
+          el('span', { class: 'ctrl-count', text: String(items.length) })
+        ]),
+        body
+      ]);
+      host.appendChild(g);
       for (const [key, def] of items) {
         shown++;
         const input = el('input', {
@@ -129,7 +142,7 @@ export function createControls(engine, store, { onRun } = {}) {
           err
         ].filter(Boolean));
 
-        host.appendChild(row);
+        body.appendChild(row);
         fields.set(key, { row, input, slider, err });
       }
     }

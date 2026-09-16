@@ -15,6 +15,7 @@ import { createControls } from './controls.js';
 import { createResults } from './results.js';
 import { createScenarioPanel } from './scenarioPanel.js';
 import { createCaseBar } from './caseBar.js';
+import { createRunHistory } from './runHistory.js';
 import { createModeSwitch } from './modeSwitch.js';
 import { createHud } from './hud.js';
 import { createSheet } from './sheet.js';
@@ -49,7 +50,7 @@ export function mountWorkspace(root, sim) {
   const runtime = createRuntime(sim.engine, store);
 
   const plant3d = el('div', { class: 'panel' }, [
-    el('header', {}, [el('span', { text: '3D plant' }), el('span', { id: 'presetbar', class: 'btnrow' })])
+    el('header', {}, [el('span', { text: '3D plant' })])
   ]);
   // The vignette is a CSS gradient over the canvas rather than a post-processing
   // pass: a constant full-screen gradient costs nothing here and a whole extra
@@ -130,10 +131,27 @@ export function mountWorkspace(root, sim) {
     streams = createStreamSystem(view);
     const built = sim.plant.build(view, streams);
     presets = createCameraPresets(view, built.presets || {});
-    const bar = plant3d.querySelector('#presetbar');
-    presets.list().forEach(p => bar.appendChild(el('button', { class: 'btn', text: p.label, onClick: () => presets.go(p.id) })));
+    // Where you can stand belongs to the plant, not to the panel that frames
+    // it. In a header the presets were a row of small buttons competing with a
+    // title; along the bottom edge of the canvas they read as the viewfinder
+    // control they are, and the one you are looking through is marked.
+    const bar = el('div', { class: 'canvas-presets', role: 'group', 'aria-label': 'Camera positions' });
+    const presetBtns = new Map();
+    presets.list().forEach(p => {
+      const b = el('button', {
+        class: 'cam', text: p.label, title: `Fly the camera to ${p.label.toLowerCase()}`,
+        onClick: () => { presets.go(p.id); markPreset(p.id); }
+      });
+      presetBtns.set(p.id, b);
+      bar.appendChild(b);
+    });
+    const markPreset = id => {
+      for (const [key, b] of presetBtns) b.dataset.on = String(key === id);
+    };
+    host3d.appendChild(bar);
+
     const start = built.presets?.overview;
-    if (start) view.jumpTo(start.pos, start.target);
+    if (start) { view.jumpTo(start.pos, start.target); markPreset('overview'); }
 
     hud = createHud(host3d);
 
@@ -239,6 +257,7 @@ export function mountWorkspace(root, sim) {
     createResults(sim.engine, store),
     panel({ title: 'Guided tour', right: tourStart, body: [tourHost] }),
     infoHost,
+    createRunHistory(sim, store, runtime),
     assumptionsPanel(sim.engine.assumptions, sim.engine.modelVersion),
     signature({ compact: true })
   );
