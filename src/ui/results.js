@@ -174,12 +174,36 @@ function row(key, f) {
   return node;
 }
 
+/**
+ * What the solver actually did, and whether to believe the numbers above it.
+ *
+ * "Converged: yes" in a row of key–values is a fact nobody reads. The same fact
+ * as a verdict, in the colour of its own status, with a sentence saying what
+ * convergence did and did not establish, is the difference between a panel that
+ * reports and a panel that tells you where you stand. A run that did not
+ * converge is the single most important thing on this rail, so it is the one
+ * thing here that is allowed to be loud.
+ */
 function solverSection(r) {
-  return collapsible('Solver', [
-    kv('Converged', r.converged ? 'yes' : 'no'),
+  const ok = r.converged === true;
+  return collapsible('Run state', [
+    el('div', { class: 'msg', dataset: { lvl: ok ? 'ok' : 'warning' } }, [
+      el('strong', { text: ok ? 'Converged. ' : 'Did not converge. ' }),
+      document.createTextNode(ok
+        ? 'The solver met its tolerance, so the balances below close on the model’s own terms.'
+        : 'The solver stopped before it met its tolerance. Treat every figure above as indicative only.')
+    ]),
     kv('Iterations', isEmpty(r.iterations) ? '—' : String(r.iterations)),
-    kv('Residual', isEmpty(r.residual) ? '—' : r.residual.toExponential(2))
+    kv('Residual', isEmpty(r.residual) ? '—' : r.residual.toExponential(2)),
+    kv('Solve time', isEmpty(r.solveMs) ? '—' : fmtMs(r.solveMs))
   ]);
+}
+
+/** Sub-millisecond solves are common here, and "0 ms" reads as "not measured". */
+function fmtMs(ms) {
+  if (ms >= 100) return `${Math.round(ms)} ms`;
+  if (ms >= 10) return `${ms.toFixed(1)} ms`;
+  return `${ms.toFixed(2)} ms`;
 }
 
 const notCalculated = () => el('div', { class: 'fallback', text: 'Not calculated' });
