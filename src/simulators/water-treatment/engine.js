@@ -17,7 +17,7 @@
 import { KIND, Status } from '../../simulation/contract.js';
 import { rules, validate as validateSpec } from '../../shared/validation.js';
 import { U } from '../../shared/units.js';
-import { fixedPoint } from '../../simulation/solver.js';
+import { fixedPoint, trace } from '../../simulation/solver.js';
 
 // ---------------------------------------------------------------------------
 // Equipment and stream identity. These tags are the shared identity between the
@@ -596,6 +596,23 @@ function solvePlant(x, recycle, fx) {
 // ---------------------------------------------------------------------------
 const field = (label, value, unit, digits = 2, kind = KIND.CALC) => ({ label, value, unit, digits, kind });
 
+/**
+ * A balance entry: a reading, plus where it sits in the balance it belongs to.
+ *
+ * Two balances live in one object here — solids and water — and until now
+ * nothing said which rows belonged to which, or which way round they pointed.
+ * `family` groups them, `side` orients them, `phase` names the stream the
+ * quantity travels in so it can carry that stream's colour.
+ *
+ * `share` is worked out here and not on the results rail. A row as a fraction
+ * of the charge is a process quantity like any other, and the rule that the
+ * interface never derives one has no exception for arithmetic that looks easy.
+ */
+const bal = (f, side, family, phase, basis) => ({
+  ...f, side, family, phase,
+  share: Number.isFinite(f.value) && Number.isFinite(basis) && basis > 0 ? f.value / basis : null
+});
+
 function buildResults(s, x, fx) {
   const running = s.qIn > 0;
   const only = v => (running && Number.isFinite(v) ? v : null);
@@ -657,21 +674,31 @@ function buildResults(s, x, fx) {
     recovery: field('Water recovery', only(s.recovery === null ? NaN : s.recovery * 100), U.pct, 2)
   };
 
+  // The two bases the rest of each balance is read against: everything the
+  // plant takes in. A row's percentage is a percentage of one of these.
+  const solidsBasis = only(s.solidsIn), waterBasis = only(s.qRaw);
+  // Washwater that is not recovered leaves the site. The water balance has
+  // always counted it — it is the third term in waterOut — but it had no row
+  // of its own, so the rows on screen did not add up to the total above them
+  // and the reader was left to work out which one was hiding the difference.
+  const washwaterLost = only(s.qBackwash * (1 - REF.washwaterYield));
+
   const massBalance = {
-    rawSolids: field('Solids in raw water', only(s.solidsInRaw), 'kg/h'),
-    chemicalSolids: field('Aluminium hydroxide formed', only(s.solidsChemical), 'kg/h', 2, KIND.FIRST),
-    totalSolidsIn: field('Total solids in', only(s.solidsIn), 'kg/h'),
-    clarifierSludge: field('Solids to clarifier sludge', only(s.solidsCaptured), 'kg/h'),
-    washwaterSludge: field('Solids to washwater sludge', only(s.solidsToWashSludge), 'kg/h'),
-    productSolids: field('Solids leaving in product water', only(s.solidsProduct), 'kg/h', 3),
-    totalSolidsOut: field('Total solids out', only(s.solidsOut), 'kg/h'),
-    solidsClosure: field('Solids balance closure error', only(s.solidsClosure * 100), U.pct, 4),
-    rawWater: field('Raw water in', only(s.qRaw), U.volFlow, 1),
-    sludgeVolume: field('Clarifier sludge volume', only(s.qSludge), U.volFlow, 3),
-    backwashVolume: field('Backwash water, time averaged', only(s.qBackwash), U.volFlow, 2),
-    recoveredVolume: field('Recovered washwater returned', only(s.qReturn), U.volFlow, 2),
-    productWater: field('Product water out', only(s.qProduct), U.volFlow, 1),
-    waterClosure: field('Water balance closure error', only(s.waterClosure * 100), U.pct, 4)
+    rawSolids: bal(field('Solids in raw water', only(s.solidsInRaw), 'kg/h'), 'in', 'solids', 'liquid', solidsBasis),
+    chemicalSolids: bal(field('Aluminium hydroxide formed', only(s.solidsChemical), 'kg/h', 2, KIND.FIRST), 'in', 'solids', 'slurry', solidsBasis),
+    totalSolidsIn: bal(field('Total solids in', only(s.solidsIn), 'kg/h'), 'total', 'solids', '', solidsBasis),
+    clarifierSludge: bal(field('Solids to clarifier sludge', only(s.solidsCaptured), 'kg/h'), 'out', 'solids', 'slurry', solidsBasis),
+    washwaterSludge: bal(field('Solids to washwater sludge', only(s.solidsToWashSludge), 'kg/h'), 'out', 'solids', 'slurry', solidsBasis),
+    productSolids: bal(field('Solids leaving in product water', only(s.solidsProduct), 'kg/h', 3), 'out', 'solids', 'liquid', solidsBasis),
+    totalSolidsOut: bal(field('Total solids out', only(s.solidsOut), 'kg/h'), 'total', 'solids', '', solidsBasis),
+    solidsClosure: bal(field('Solids balance closure error', only(s.solidsClosure * 100), U.pct, 4), 'closure', 'solids', '', null),
+    rawWater: bal(field('Raw water in', only(s.qRaw), U.volFlow, 1), 'in', 'water', 'liquid', waterBasis),
+    productWater: bal(field('Product water out', only(s.qProduct), U.volFlow, 1), 'out', 'water', 'liquid', waterBasis),
+    sludgeVolume: bal(field('Clarifier sludge volume', only(s.qSludge), U.volFlow, 3), 'out', 'water', 'slurry', waterBasis),
+    washwaterLost: bal(field('Washwater not recovered', washwaterLost, U.volFlow, 3), 'out', 'water', 'slurry', waterBasis),
+    backwashVolume: bal(field('Backwash water drawn, time averaged', only(s.qBackwash), U.volFlow, 2), 'context', 'water', 'liquid', waterBasis),
+    recoveredVolume: bal(field('Recovered washwater returned', only(s.qReturn), U.volFlow, 2), 'context', 'water', 'liquid', waterBasis),
+    waterClosure: bal(field('Water balance closure error', only(s.waterClosure * 100), U.pct, 4), 'closure', 'water', '', null)
   };
 
   const energyBalance = {
@@ -983,6 +1010,42 @@ function equipmentFrom(s, x, fx) {
     ...run(false), load: off ? 0 : clamp(s.pTotal / 400, 0, 1),
     values: { 'Total shaft power': fmt(s.pTotal, 1, U.powerKW), 'Specific energy': fmt(s.specificEnergy, 3, 'kWh/m³') }
   };
+
+  // Numeric companions to the display strings above — the same readings, held
+  // as numbers so they can be scaled and compared rather than only read. See
+  // contract.js: the strings in `values` carry their units inside them and
+  // parsing a number back out of one would be the interface deriving a process
+  // value, which it may not do.
+  //
+  // This plant is isothermal, so there is no temperature worth shading by: one
+  // raw-water temperature is an input and it applies everywhere. What does
+  // change along the train is the thing the works exists to change — how much
+  // is still in the water. That is the honest scalar here.
+  const clarity = {
+    [TAGS.intakePump]: x.turbidityIn,
+    [TAGS.coagDosing]: s.turbidityPlant,
+    [TAGS.rapidMix]: s.turbidityPlant,
+    [TAGS.floc]: s.turbidityPlant,
+    [TAGS.clarifier]: s.turbiditySettled,
+    [TAGS.sludge]: NaN,
+    [TAGS.filters]: s.turbidityFiltered,
+    [TAGS.backwashTank]: s.turbidityFiltered,
+    [TAGS.backwashPump]: s.turbidityFiltered,
+    [TAGS.blower]: NaN,
+    [TAGS.washRecovery]: s.tssReturnNext / REF.tssPerNtu,
+    [TAGS.chlorineDosing]: s.turbidityFiltered,
+    [TAGS.contactTank]: s.turbidityFiltered,
+    [TAGS.clearwell]: s.turbidityFiltered,
+    [TAGS.highLiftPump]: s.turbidityFiltered,
+    [TAGS.mcc]: NaN
+  };
+  const only1 = v => (off || !Number.isFinite(v) ? null : v);
+  for (const [tag, e] of Object.entries(eq)) {
+    e.metrics = {
+      turbidityNtu: only1(clarity[tag]),
+      load: only1(e.load)
+    };
+  }
   return eq;
 }
 
@@ -1031,10 +1094,10 @@ function getInitialState(inputs = {}) {
     reason: 'Not calculated — set the operating conditions and run the simulation.',
     kpis: built.kpis.map(k => ({ ...k, value: null })),
     results: Object.fromEntries(Object.entries(built.results).map(([k, v]) => [k, { ...v, value: null }])),
-    massBalance: Object.fromEntries(Object.entries(built.massBalance).map(([k, v]) => [k, { ...v, value: null }])),
+    massBalance: Object.fromEntries(Object.entries(built.massBalance).map(([k, v]) => [k, { ...v, value: null, share: null }])),
     energyBalance: Object.fromEntries(Object.entries(built.energyBalance).map(([k, v]) => [k, { ...v, value: null }])),
     quality: Object.fromEntries(Object.entries(built.quality).map(([k, v]) => [k, { ...v, value: v.kind === KIND.REF ? v.value : null }])),
-    charts: [], messages: [], diagnostics: [], streams: [], equipment: {}, steps: []
+    charts: [], messages: [], diagnostics: [], streams: [], equipment: {}, steps: [], convergence: []
   };
 }
 
@@ -1053,6 +1116,16 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
       { tol: 1e-7, maxIter: 80, relax: 0.8 })
     : { x: { qReturn: 0, tssReturn: 0 }, converged: true, iterations: 0, residual: 0, history: [] };
 
+  // What the solver did on the way, not just where it ended up. Both returns
+  // below carry it: a run that failed to converge is the one where seeing the
+  // residual stall rather than fall is worth most.
+  const convergence = [trace(
+    'recycle',
+    'Washwater recovery recycle',
+    'Relative change in the recovered flow and its solids between one sweep of the plant and the next. The loop is closed when a sweep reproduces the return it was given.',
+    1e-7, solve
+  )].filter(Boolean);
+
   const s = solvePlant(eff, solve.x, fx);
   const built = buildResults(s, eff, fx);
   const diagnostics = solve.converged
@@ -1065,7 +1138,7 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
   if (!solve.converged) {
     return {
       ...getInitialState(inputs), status: Status.ERROR, converged: false,
-      iterations: solve.iterations, residual: solve.residual,
+      iterations: solve.iterations, residual: solve.residual, convergence,
       reason: 'Recycle loop did not converge', messages: [], diagnostics
     };
   }
@@ -1075,7 +1148,7 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
   if (s.infeasible.length) {
     return {
       ...getInitialState(inputs), status: Status.ERROR,
-      converged: solve.converged, iterations: solve.iterations, residual: solve.residual,
+      converged: solve.converged, iterations: solve.iterations, residual: solve.residual, convergence,
       reason: 'No physically operable state at these conditions',
       messages: [],
       diagnostics: [...notes.map(text => ({ level: 'warning', text })),
@@ -1092,18 +1165,43 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
 
   return {
     status, converged: solve.converged, iterations: solve.iterations, residual: solve.residual,
-    reason: scenario, ...built,
+    convergence, reason: scenario, ...built,
     messages: [], diagnostics,
     streams: streamsFrom(s), equipment: equipmentFrom(s, eff, fx),
     steps: buildSteps(s, eff, fx), state: s
   };
 }
 
+/**
+ * How this plant may be shaded, declared by the only layer entitled to decide.
+ *
+ * The domains are fixed rather than taken from the run. A scale stretched to
+ * fit whatever the current case happens to contain makes every plant look
+ * equally loaded and equally dirty, and makes two runs impossible to compare by
+ * eye — which is the one thing a colour mode is for.
+ */
+const colourModes = [
+  {
+    id: 'state', label: 'Running state', kind: 'state',
+    what: 'Each unit in the colour of what it is doing — running, warning, tripped or stopped. This is what colour has meant here all along.'
+  },
+  {
+    id: 'turbidity', label: 'Turbidity', kind: 'scale',
+    metric: 'turbidityNtu', unit: U.turbidity, domain: [0.02, inputSpec.turbidityIn.max], scale: 'log', digits: 2,
+    what: 'What is still in the water as it leaves each unit. A works takes this from tens of NTU to hundredths, so the ramp is logarithmic: on a linear one everything downstream of the clarifier would be the same colour and the plant would look as though it stopped working at the filters.'
+  },
+  {
+    id: 'load', label: 'Loading', kind: 'scale',
+    metric: 'load', unit: U.dimensionless, domain: [0, 1], scale: 'linear', digits: 2,
+    what: 'How hard each unit is working against the duty it was sized for. 1.00 is the design point rather than a limit, and units with no meaningful loading are left unshaded instead of shaded zero.'
+  }
+];
+
 export default {
   id: 'water-treatment',
   modelVersion: '1.0.0',
   inputSpec, assumptions, equations,
-  TAGS, STREAMS, FAULT_IDS, REF,
+  TAGS, STREAMS, FAULT_IDS, REF, colourModes,
   validate,
   getInitialState,
   run,

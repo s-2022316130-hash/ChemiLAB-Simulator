@@ -9,7 +9,7 @@ import { createEnvironment } from './env.js';
 import { REFERENCE_ASPECT, BASE_FOV } from './cameras.js';
 import { compact } from './geometry.js';
 import { makeLabel, updateLabel, selectionRing, CAPTION_DEFAULT } from './labels.js';
-import { highlight, setSceneTheme } from './materials.js';
+import { highlight, setSceneTheme, tint } from './materials.js';
 import { onFrame, createQualityGovernor, damp, smoothstep } from '../shared/animation.js';
 import { token, tokenNumber, getTheme, onThemeChange } from '../shared/theme.js';
 
@@ -169,6 +169,10 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   // all off is what "captions off" means.
   let captions = handheld ? { tags: true, names: false, values: false } : { ...CAPTION_DEFAULT };
   let equipmentState = {};
+  // The colour mode currently on the plant, kept so a theme change can be
+  // re-applied to it: the tint is mixed from the palette, and the palette is
+  // what a theme change rewrites.
+  let tintMap = {};
 
   const equipment = new Map();   // tag -> {group, meta, label}
   const ray = new THREE.Raycaster();
@@ -339,6 +343,11 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   // --- theme ---------------------------------------------------------------
   const offTheme = onThemeChange(theme => {
     setSceneTheme(theme);
+    // The palette the tint is mixed from has just been rewritten, so the mix
+    // has to be taken again. The ramp colours change with the theme too, and
+    // whoever owns the colour mode recomputes those and calls back through;
+    // this keeps the plant from flashing its untinted colours in between.
+    for (const [tag, e] of equipment) tint(e.group, tintMap[tag] ?? null);
     hue.set(token('--hue', '#0e7490'));
     env.apply();
     renderer.toneMappingExposure = tokenNumber('--scene-exposure', 1);
@@ -479,6 +488,22 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
       return { ...captions };
     },
     get captions() { return { ...captions }; },
+
+    /**
+     * Shade the plant by a colour mode: `{tag: '#rrggbb' | null}`.
+     *
+     * A tag the map does not mention, or maps to null, is cleared rather than
+     * left as it was — a stale tint is worse than none, because it is a reading
+     * from a run that is no longer on screen. Nothing else about the scene
+     * changes: the geometry, the camera and the captions are untouched, and the
+     * selection outline goes on doing its own job over the top.
+     */
+    setEquipmentTint(map) {
+      const m = map || {};
+      tintMap = m;
+      for (const [tag, e] of equipment) tint(e.group, m[tag] ?? null);
+      refreshShadows();
+    },
 
     /** Feed the captions the engine's equipment state, straight through. */
     setEquipmentValues(state) {

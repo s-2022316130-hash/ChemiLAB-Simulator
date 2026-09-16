@@ -79,7 +79,20 @@ export function createControls(engine, store, { onRun } = {}) {
 
     let shown = 0;
     for (const [group, items] of groups) {
-      host.appendChild(el('div', { class: 'sect', text: group }));
+      // Each group folds away. At student level there are five inputs and this
+      // does nothing; at expert level there are twenty and being able to shut
+      // the three sections you are not working on is the difference between a
+      // panel and a wall. Open by default, always — a control you cannot see is
+      // a control you do not know exists.
+      const body = el('div', { class: 'ctrl-body' });
+      const g = el('details', { class: 'ctrl-group', open: true }, [
+        el('summary', {}, [
+          el('span', { class: 'ctrl-name', text: group }),
+          el('span', { class: 'ctrl-count', text: String(items.length) })
+        ]),
+        body
+      ]);
+      host.appendChild(g);
       for (const [key, def] of items) {
         shown++;
         const input = el('input', {
@@ -104,11 +117,23 @@ export function createControls(engine, store, { onRun } = {}) {
           }
         }) : null;
 
+        // The value sits on the label's own line, at the size of a readout
+        // rather than of a form field. A control whose current setting is the
+        // smallest thing in the row reads as a form; one whose setting is the
+        // largest reads as an instrument, which is what this is. It stays a
+        // real number input — typing a value is still the fastest way to enter
+        // an exact one — it is simply not dressed as a box until you touch it.
+        input.style.width = `${valueChars(def)}ch`;
+
         const err = el('div', { class: 'err', style: 'display:none' });
         const row = el('div', { class: 'field' }, [
-          el('label', { text: def.label }),
-          el('span', { class: 'unit', text: def.unit || '' }),
-          input,
+          el('div', { class: 'field-top' }, [
+            el('label', { text: def.label }),
+            el('div', { class: 'field-val' }, [
+              input,
+              def.unit ? el('span', { class: 'unit', text: def.unit }) : null
+            ].filter(Boolean))
+          ]),
           slider,
           hasRange ? el('div', { class: 'range-ends' }, [
             el('span', { text: fmtEnd(def.min) }),
@@ -117,7 +142,7 @@ export function createControls(engine, store, { onRun } = {}) {
           err
         ].filter(Boolean));
 
-        host.appendChild(row);
+        body.appendChild(row);
         fields.set(key, { row, input, slider, err });
       }
     }
@@ -155,6 +180,24 @@ export function createControls(engine, store, { onRun } = {}) {
   store.subKeys(['level'], s => { if (s.level !== builtLevel) { build(s.level); sync(store.get()); } });
   store.subKeys(['inputs', 'errors', 'status', 'dirty'], sync);
   return p;
+}
+
+/**
+ * How wide the value needs to be, in characters, from what the spec declares.
+ *
+ * Sized from the range and the step rather than left to shrink-to-fit, because
+ * a field that resizes as you type moves the unit beside it on every keystroke,
+ * and a column of controls whose values do not share an edge is much harder to
+ * scan than one whose values do.
+ */
+function valueChars(def) {
+  const decimals = (String(def.step ?? '').split('.')[1] || '').length;
+  const digits = Math.max(
+    String(Math.trunc(Math.abs(def.max ?? 0))).length,
+    String(Math.trunc(Math.abs(def.min ?? 0))).length,
+    1);
+  const sign = (def.min ?? 0) < 0 ? 1 : 0;
+  return Math.min(10, digits + (decimals ? decimals + 1 : 0) + sign + 0.5);
 }
 
 /** Range ends read as bounds, not as measurements: no trailing zeros. */

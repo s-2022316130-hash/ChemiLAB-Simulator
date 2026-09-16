@@ -18,6 +18,10 @@ export function createRuntime(engine, store) {
     store.set({ status: Status.CALCULATING, errors: {}, messages: [] });
     await new Promise(r => setTimeout(r, 0)); // yield so the UI can paint CALCULATING
     let result;
+    // How long the engine took, measured around the call. It is a fact about
+    // the software and not a process value, so it belongs here rather than in
+    // the model — the same way the renderer's frame time does.
+    const t0 = performance.now();
     try {
       result = engine.run(inputs, { scenario, faults });
     } catch (err) {
@@ -26,12 +30,13 @@ export function createRuntime(engine, store) {
         messages: [{ level: 'error', text: `Calculation failed: ${err.message}` }] });
       return null;
     }
+    const solveMs = performance.now() - t0;
     if (my !== token) return null; // superseded by a newer run
     const messages = [...(result.messages || []), ...engine.getDiagnostics(result)];
     const status = result.status ?? (result.converged
       ? (messages.some(m => m.level === 'warning') ? Status.WARNING : Status.COMPLETE)
       : Status.ERROR);
-    store.set({ status, result: { ...result, messages }, messages });
+    store.set({ status, result: { ...result, messages, solveMs }, messages });
     return result;
   }
   function reset(inputs) {

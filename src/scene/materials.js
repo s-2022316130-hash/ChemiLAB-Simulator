@@ -132,6 +132,78 @@ function highlightColour() {
  * out. The lift is emissive rather than a colour change, so a warning amber
  * stays amber while the pointer is over it.
  */
+/**
+ * Shade one equipment group by a colour mode, or clear it with `colour = null`.
+ *
+ * Three things make this harder than setting a colour, and all three are why it
+ * lives here beside the palette rather than in the renderer.
+ *
+ * The palette is shared. Every vessel in the plant points at the same `MAT`
+ * entry, so writing a tint into it would shade the whole plant. The first tint
+ * on a mesh therefore clones its material and keeps the shared one in
+ * `_tintOrig` — by reference, not by value, so a theme change that recolours
+ * the palette still reaches the base this tint is mixed from.
+ *
+ * After that first clone the material is never swapped again, only mutated.
+ * That matters because `highlight()` swaps materials too, and two mechanisms
+ * swapping the same slot from different directions is how a hover ends up
+ * permanently amber. Mutating in place means the highlight's saved original
+ * stays valid whatever this function does.
+ *
+ * Named meshes are left alone. A name is how a plant module reaches the parts it
+ * drives from engine results — 'liquid', 'flame', 'lamp' — and those already
+ * carry a meaning of their own. Shading a vessel's shell by temperature while
+ * its contents keep saying how full it is tells you two things at once; shading
+ * both tells you neither.
+ */
+const TINT_MIX = 0.66;        // how far toward the ramp colour the base moves
+const TINT_METALNESS = 0.3;   // a mirror takes no colour: polished steel has to
+const TINT_ROUGHNESS = 0.46;  // dull slightly, or the tint is invisible on it
+
+export function tint(group, colour) {
+  if (!group?.isObject3D) return;
+  const c = colour ? new THREE.Color(colour) : null;
+  group.traverse(o => {
+    if (!o.isMesh || !o.material || o.name || Array.isArray(o.material)) return;
+
+    if (!o.userData._tintOrig) {
+      if (!c) return;                       // nothing to clear — never tinted
+      // If the pointer is already on this unit, `o.material` is the highlight's
+      // temporary clone and the real base is the one it put aside. Taking the
+      // visible material as the base would mix the tint into a copy that is
+      // about to be disposed, and the shading would vanish on mouse-out.
+      const base = o.userData._orig || o.material;
+      o.userData._tintOrig = base;
+      const clone = base.clone();
+      o.userData._tintMat = clone;
+      // Take the slot the highlight is not using. While a highlight is up that
+      // is its saved original — otherwise mouse-out would restore the untinted
+      // material straight over the top of this.
+      if (o.userData._orig) o.userData._orig = clone;
+      else o.material = clone;
+    }
+
+    const base = o.userData._tintOrig, m = o.userData._tintMat;
+    if (!base || !m) return;
+    if (c) {
+      m.color.copy(base.color).lerp(c, TINT_MIX);
+      m.metalness = Math.min(base.metalness ?? 0, TINT_METALNESS);
+      m.roughness = Math.max(base.roughness ?? 0.5, TINT_ROUGHNESS);
+    } else {
+      m.color.copy(base.color);
+      m.metalness = base.metalness ?? 0;
+      m.roughness = base.roughness ?? 0.5;
+    }
+    // A live highlight is showing a clone of this material, so it has to be
+    // brought along or the tint would not appear until the pointer left.
+    if (o.userData._orig && o.material !== m && o.material?.color) {
+      o.material.color.copy(m.color);
+      o.material.metalness = m.metalness;
+      o.material.roughness = m.roughness;
+    }
+  });
+}
+
 export function highlight(mesh, on) {
   const tint = highlightColour();
   mesh.traverse(o => {

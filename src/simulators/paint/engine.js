@@ -32,7 +32,7 @@
 import { KIND, Status } from '../../simulation/contract.js';
 import { rules, validate as validateSpec } from '../../shared/validation.js';
 import { U } from '../../shared/units.js';
-import { bisect } from '../../simulation/solver.js';
+import { bisect, trace } from '../../simulation/solver.js';
 
 // ---------------------------------------------------------------------------
 // Shared identity between engine, plant.js (userData.tag) and flowsheet.js.
@@ -395,7 +395,10 @@ function solveTemperature(f, mb, x, fx, alpha, geometry) {
   const solve = bisect(residual, lo, hi, { tol: 1e-6, maxIter: 200 });
   const tEnd = solve.x;
   const check = tEnd === null ? null : Math.abs(residual(tEnd));
-  return { tEnd, converged: tEnd !== null && check !== null && check < 1e-4, iterations: solve.iterations, residual: check };
+  return {
+    tEnd, converged: tEnd !== null && check !== null && check < 1e-4,
+    iterations: solve.iterations, residual: check, history: solve.history
+  };
 }
 
 /**
@@ -794,6 +797,18 @@ export const equations = [
 // Result assembly
 // ---------------------------------------------------------------------------
 const field = (label, value, unit, digits = 2, kind = KIND.CALC) => ({ label, value, unit, digits, kind });
+
+/**
+ * A balance entry: a reading, plus where it sits in the balance it belongs to.
+ * `family` groups the rows that sum together, `side` orients them, `phase` names
+ * the phase the quantity is in. `share` is worked out here and not on the
+ * results rail — a row as a fraction of the charge is a process quantity like
+ * any other. See contract.js.
+ */
+const bal = (f, side, family, phase, basis) => ({
+  ...f, side, family, phase,
+  share: Number.isFinite(f.value) && Number.isFinite(basis) && basis > 0 ? f.value / basis : null
+});
 const fmt = (v, d, unit) => (Number.isFinite(v) ? `${v.toFixed(d)}${unit ? ' ' + unit : ''}` : '—');
 
 function buildResults(s, x, fx) {
@@ -895,20 +910,28 @@ function buildResults(s, x, fx) {
     energyPerLitre: field('Dispersion energy per litre', only(s.energyPerLitre), 'Wh/L', 1)
   };
 
+  // A batch, so the balance is over one make rather than over an hour, and the
+  // charge is what everything is read against. There is no closure row and
+  // there should not be one: the product mass is defined as the charge less
+  // what evaporated and less what the dust collector caught, so a closure here
+  // would always print zero and would be reporting the definition rather than
+  // the plant.
+  const chargeBasis = only(s.chargedMass);
+
   const massBalance = {
-    pigmentCharged: field('Pigment charged', only(s.f.mPigment * x.batchVolume / 1000), 'kg', 1),
-    resinCharged: field('Resin solution charged', only(s.f.mResinSolution * x.batchVolume / 1000), 'kg', 1),
-    solventCharged: field('Solvent charged', only(s.f.mSolventAdded * x.batchVolume / 1000), 'kg', 1),
-    additivesCharged: field('Additives charged', only((s.f.mThickener + s.f.mColourant) * x.batchVolume / 1000), 'kg', 2),
-    totalCharged: field('Total charged', only(s.chargedMass), 'kg', 1),
-    productOut: field('Paint produced', only(s.productMass), 'kg', 1),
-    evaporated: field('Solvent lost as vapour', only(s.evaporated), 'kg', 2),
-    dustLost: field('Pigment lost to the dust collector', only(s.dustLost), 'kg', 2),
-    volumeCheck: field('Component volumes per litre of paint', only(s.volumeCheck), 'mL/L', 4, KIND.FIRST),
-    volumeCharged: field('Volume charged', only(s.chargedVolume), 'L', 1),
-    volumeTarget: field('Batch volume target', only(x.batchVolume), 'L', 1, KIND.USER),
-    yieldVolume: field('Paint recovered', only(s.yieldVolume), 'L', 1),
-    batchYield: field('Batch yield', pctOf(s.batchYield), U.pct, 3)
+    pigmentCharged: bal(field('Pigment charged', only(s.f.mPigment * x.batchVolume / 1000), 'kg', 1), 'in', 'mass', 'solid', chargeBasis),
+    resinCharged: bal(field('Resin solution charged', only(s.f.mResinSolution * x.batchVolume / 1000), 'kg', 1), 'in', 'mass', 'liquid', chargeBasis),
+    solventCharged: bal(field('Solvent charged', only(s.f.mSolventAdded * x.batchVolume / 1000), 'kg', 1), 'in', 'mass', 'liquid', chargeBasis),
+    additivesCharged: bal(field('Additives charged', only((s.f.mThickener + s.f.mColourant) * x.batchVolume / 1000), 'kg', 2), 'in', 'mass', 'liquid', chargeBasis),
+    totalCharged: bal(field('Total charged', only(s.chargedMass), 'kg', 1), 'total', 'mass', '', chargeBasis),
+    productOut: bal(field('Paint produced', only(s.productMass), 'kg', 1), 'out', 'mass', 'liquid', chargeBasis),
+    evaporated: bal(field('Solvent lost as vapour', only(s.evaporated), 'kg', 2), 'out', 'mass', 'gas', chargeBasis),
+    dustLost: bal(field('Pigment lost to the dust collector', only(s.dustLost), 'kg', 2), 'out', 'mass', 'solid', chargeBasis),
+    volumeCharged: bal(field('Volume charged', only(s.chargedVolume), 'L', 1), 'in', 'volume', 'liquid', only(x.batchVolume)),
+    volumeTarget: bal(field('Batch volume target', only(x.batchVolume), 'L', 1, KIND.USER), 'total', 'volume', '', only(x.batchVolume)),
+    yieldVolume: bal(field('Paint recovered', only(s.yieldVolume), 'L', 1), 'out', 'volume', 'liquid', only(x.batchVolume)),
+    batchYield: bal(field('Batch yield', pctOf(s.batchYield), U.pct, 3), 'context', 'volume', '', null),
+    volumeCheck: bal(field('Component volumes per litre of paint', only(s.volumeCheck), 'mL/L', 4, KIND.FIRST), 'context', 'volume', '', null)
   };
 
   const energyBalance = {
@@ -1155,6 +1178,35 @@ function equipmentFrom(s, x, fx) {
       'Energy per litre': fmt(s.energyPerLitre, 1, 'Wh/L')
     }
   };
+  // Numeric companions to the display strings above — the same readings held as
+  // numbers so they can be scaled and compared rather than only read. See
+  // contract.js: parsing a number back out of a formatted string would be the
+  // interface deriving a process value, which it may not do.
+  //
+  // A paint plant runs cold, and the interesting thing about its temperature is
+  // that most of it is unwanted. Nothing here is heated: the batch climbs
+  // because a high-speed disperser puts its whole shaft power into the mix as
+  // heat, and the jacket is there to take it back out again. The raw material
+  // tanks sit at whatever the charge came in at.
+  const tempAt = {
+    [TAGS.resinTank]: x.chargeTemp,
+    [TAGS.solventTank]: x.chargeTemp,
+    [TAGS.additiveSkid]: x.chargeTemp,
+    [TAGS.bagDump]: x.chargeTemp,
+    [TAGS.disperser]: s.temperature?.tEnd,
+    [TAGS.chiller]: x.jacketTemp,
+    [TAGS.letdownTank]: s.paintTemp,
+    [TAGS.transferPump]: s.paintTemp,
+    [TAGS.filter]: s.paintTemp,
+    [TAGS.fillingLine]: s.paintTemp
+  };
+  const only1 = v => (off || !Number.isFinite(v) ? null : v);
+  for (const [tag, e] of Object.entries(eq)) {
+    e.metrics = {
+      tempC: only1(tempAt[tag]),
+      load: only1(e.load ?? e.duty)
+    };
+  }
   return eq;
 }
 
@@ -1301,14 +1353,14 @@ function getInitialState(inputs = {}) {
     ? { kpis: [], results: {}, massBalance: {}, energyBalance: {}, quality: {} }
     : buildResults(s, blank, fx);
   const nulls = obj => Object.fromEntries(Object.entries(obj).map(([k, v]) =>
-    [k, { ...v, value: v.kind === KIND.REF ? v.value : null }]));
+    [k, { ...v, value: v.kind === KIND.REF ? v.value : null, ...(v.share === undefined ? {} : { share: null }) }]));
   return {
     status: Status.READY, converged: false, iterations: null, residual: null,
     reason: 'Not calculated — make up the formulation and run the batch.',
     kpis: (built.kpis || []).map(k => ({ ...k, value: null })),
     results: nulls(built.results || {}), massBalance: nulls(built.massBalance || {}),
     energyBalance: nulls(built.energyBalance || {}), quality: nulls(built.quality || {}),
-    charts: [], messages: [], diagnostics: [], streams: [], equipment: {}, steps: []
+    charts: [], messages: [], diagnostics: [], streams: [], equipment: {}, steps: [], convergence: []
   };
 }
 
@@ -1316,6 +1368,16 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
   const fx = faultEffects(faults);
   const { eff, notes } = effectiveInputs(inputs, fx);
   const s = solveBatch(eff, fx);
+
+  // The batch temperature is the only thing here that has to be iterated: the
+  // shaft power the disperser draws depends on the viscosity, the viscosity
+  // depends on the temperature, and the temperature depends on the shaft power.
+  const convergence = [trace(
+    'batch-temperature',
+    'Batch energy balance',
+    'How far the end-of-dispersion temperature that comes out of the energy balance is from the one that was assumed going in, in kelvin. Shaft power sets the temperature, the temperature sets the viscosity, and the viscosity sets the shaft power, so the three have to be settled together.',
+    1e-4, s.temperature
+  )].filter(Boolean);
 
   if (s.infeasible) {
     return {
@@ -1329,6 +1391,7 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
     return {
       ...getInitialState(inputs), status: Status.ERROR, converged: false,
       iterations: s.temperature?.iterations ?? null, residual: s.temperature?.residual ?? null,
+      convergence,
       reason: 'Batch energy balance did not converge',
       messages: [],
       diagnostics: [...notes.map(text => ({ level: 'warning', text })), {
@@ -1348,18 +1411,42 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
     converged: true,
     iterations: s.temperature.iterations,
     residual: s.temperature.residual,
-    reason: scenario, ...built,
+    convergence, reason: scenario, ...built,
     messages: [], diagnostics,
     streams: streamsFrom(s, eff), equipment: equipmentFrom(s, eff, fx),
     steps: buildSteps(s, eff, fx), state: s
   };
 }
 
+/**
+ * How this plant may be shaded. The domain is fixed to the validated range of
+ * the model rather than stretched to fit the run: a scale that rescales itself
+ * makes every batch look equally hot and makes two runs impossible to compare
+ * by eye, which is the one thing a colour mode is for.
+ */
+const colourModes = [
+  {
+    id: 'state', label: 'Running state', kind: 'state',
+    what: 'Each unit in the colour of what it is doing — running, warning or stopped. This is what colour has meant here all along.'
+  },
+  {
+    id: 'thermal', label: 'Temperature', kind: 'scale',
+    metric: 'tempC', unit: U.tempC,
+    domain: [inputSpec.jacketTemp.min, REF.flashPoint], scale: 'linear', digits: 1,
+    what: 'The temperature of the batch at each unit. Nothing in this plant is heated on purpose — the disperser puts its whole shaft power into the mix as heat and the jacket takes it back out. The scale runs from the coldest the jacket can be set to the flash point of the solvent, so the top of it is the temperature at which an open vessel with a spark source in it becomes a flammable atmosphere.'
+  },
+  {
+    id: 'load', label: 'Duty and loading', kind: 'scale',
+    metric: 'load', unit: U.dimensionless, domain: [0, 1], scale: 'linear', digits: 2,
+    what: 'How hard each unit is working against the duty it was sized for. 1.00 is the design point rather than a limit, and units with no meaningful loading are left unshaded instead of shaded zero.'
+  }
+];
+
 export default {
   id: 'paint',
   modelVersion: '1.0.0',
   inputSpec, assumptions, equations,
-  TAGS, STREAMS, FAULT_IDS, REF,
+  TAGS, STREAMS, FAULT_IDS, REF, colourModes,
   validate,
   getInitialState,
   run,

@@ -21,10 +21,10 @@ const fmtTick = v => {
   return v.toFixed(2);
 };
 
-const empty = (root, w, h) => {
+const empty = (root, w, h, text = 'Not calculated') => {
   root.appendChild(svg('text', {
     x: w / 2, y: h / 2, fill: 'var(--ink-ghost)', 'font-size': 11,
-    'font-family': 'var(--font)', 'text-anchor': 'middle', text: 'Not calculated'
+    'font-family': 'var(--font)', 'text-anchor': 'middle', text
   }));
   return root;
 };
@@ -181,3 +181,121 @@ export function gauge({ value, min = 0, max = 100, label = '', unit = '%', size 
 }
 
 export { clear };
+
+/**
+ * Residual against iteration, for a convergence trace off `Result.convergence`.
+ *
+ * Logarithmic, and not as a stylistic choice. A solve that starts at 30 and
+ * finishes at 5e-8 spans nine decades; drawn linearly it is a vertical drop
+ * followed by nine tenths of a chart that reads as a flat line along zero,
+ * which says nothing about the part that matters. On a log scale the same data
+ * shows its slope, and the slope is the fact worth having — a straight fall is
+ * a well-posed problem, a fall that flattens into a shelf is a loop the relaxation
+ * is fighting, and a sawtooth is a model that is not continuous where the solver
+ * assumed it was.
+ *
+ * The tolerance is drawn as a rule across the frame. Without it the curve has
+ * no reference and "converged" is just a word on another line; with it, where
+ * the curve crosses the rule is the answer, and how long it ran afterwards is
+ * visible too.
+ */
+export function residualChart({ history = [], tol = null, width = 320, height = 150 }) {
+  const root = svg('svg', { viewBox: `0 0 ${width} ${height}`, width: '100%', role: 'img' });
+  const pts = history.filter(v => Number.isFinite(v) && v >= 0);
+  // No history is not no answer: a single-phase flash and an analytic branch
+  // both solve without iterating, and saying so beats an empty axis.
+  if (!pts.length) return empty(root, width, height, 'Solved without iterating');
+  if (pts.length === 1) return empty(root, width, height, 'Solved in a single pass');
+
+  const hasTol = Number.isFinite(tol) && tol > 0;
+  const positive = pts.filter(v => v > 0);
+  const floor = positive.length ? Math.min(...positive) : 1e-12;
+  const lo = hasTol ? Math.min(floor, tol) : floor;
+  const hi = Math.max(...pts, hasTol ? tol : 0, lo * 10);
+
+  let e0 = Math.floor(Math.log10(lo)), e1 = Math.ceil(Math.log10(hi));
+  // Two decades minimum. A solve that improved by a factor of three is a real
+  // result, and stretching it over the whole frame would make it look like a
+  // collapse it was not.
+  if (e1 - e0 < 2) e1 = e0 + 2;
+
+  const plotH = height - PAD.t - PAD.b;
+  // A residual of exactly zero has no logarithm. It sits on the floor of the
+  // frame rather than being dropped — hitting the answer exactly is the best
+  // outcome there is and it should not be the one point that vanishes.
+  const sy = v => {
+    const k = (Math.log10(v > 0 ? v : Math.pow(10, e0)) - e0) / (e1 - e0);
+    return (height - PAD.b) - Math.max(0, Math.min(1, k)) * plotH;
+  };
+  const sx = i => PAD.l + (pts.length > 1 ? i / (pts.length - 1) : 0.5) * (width - PAD.l - PAD.r);
+
+  // One gridline per decade while they are few enough to read; above that,
+  // every other one, so the labels do not collide into a grey band.
+  const step = Math.max(1, Math.ceil((e1 - e0) / 4));
+  for (let e = e0; e <= e1; e += step) {
+    const y = sy(Math.pow(10, e));
+    root.appendChild(svg('path', {
+      d: `M${PAD.l} ${y.toFixed(1)} H${width - PAD.r}`,
+      stroke: e === e0 ? 'var(--line-strong)' : 'var(--line-soft)', fill: 'none', 'stroke-width': 1
+    }));
+    root.appendChild(svg('text', {
+      x: PAD.l - 6, y: (y + 3.2).toFixed(1), fill: 'var(--ink-ghost)', 'font-size': 8.5,
+      'font-family': 'var(--mono)', 'text-anchor': 'end',
+      text: e === 0 ? '1' : `1e${e}`
+    }));
+  }
+  root.appendChild(svg('path', {
+    d: `M${PAD.l} ${PAD.t} V${height - PAD.b}`, stroke: 'var(--line)', fill: 'none', 'stroke-width': 1
+  }));
+
+  const d = pts.map((v, i) => `${i ? 'L' : 'M'}${sx(i).toFixed(1)} ${sy(v).toFixed(1)}`).join(' ');
+  const base = (height - PAD.b).toFixed(1);
+  root.appendChild(svg('path', {
+    d: `${d} L${sx(pts.length - 1).toFixed(1)} ${base} L${sx(0).toFixed(1)} ${base} Z`,
+    fill: 'var(--hue)', opacity: 0.1, stroke: 'none'
+  }));
+  root.appendChild(svg('path', {
+    d, fill: 'none', stroke: 'var(--hue)', 'stroke-width': 1.8,
+    'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+  }));
+
+  // The tolerance, over the curve rather than under it: the question this chart
+  // answers is where the two meet.
+  if (hasTol) {
+    const y = sy(tol).toFixed(1);
+    root.appendChild(svg('path', {
+      d: `M${PAD.l} ${y} H${width - PAD.r}`, stroke: 'var(--ok)', fill: 'none',
+      'stroke-width': 1.2, 'stroke-dasharray': '4 3', opacity: 0.9
+    }));
+    root.appendChild(svg('text', {
+      x: width - PAD.r, y: Number(y) - 4, fill: 'var(--ok)', 'font-size': 8.5,
+      'font-family': 'var(--mono)', 'text-anchor': 'end',
+      'paint-order': 'stroke', stroke: 'var(--bg-1)', 'stroke-width': 3, 'stroke-linejoin': 'round',
+      text: `tolerance ${tol.toExponential(0)}`
+    }));
+  }
+
+  // Where it ended up, marked. The last value is the one the verdict was made on.
+  root.appendChild(svg('circle', {
+    cx: sx(pts.length - 1).toFixed(1), cy: sy(pts[pts.length - 1]).toFixed(1), r: 2.6,
+    fill: 'var(--hue)', stroke: 'var(--bg-1)', 'stroke-width': 1.5
+  }));
+
+  root.appendChild(svg('text', {
+    x: PAD.l, y: height - 6, fill: 'var(--ink-ghost)', 'font-size': 8.5,
+    'font-family': 'var(--mono)', text: '1'
+  }));
+  root.appendChild(svg('text', {
+    x: width - PAD.r, y: height - 6, fill: 'var(--ink-ghost)', 'font-size': 8.5,
+    'font-family': 'var(--mono)', 'text-anchor': 'end', text: String(pts.length)
+  }));
+  root.appendChild(svg('text', {
+    x: (PAD.l + width - PAD.r) / 2, y: height - 6, fill: 'var(--ink-faint)', 'font-size': 9,
+    'font-family': 'var(--font)', 'text-anchor': 'middle', text: 'iteration'
+  }));
+  root.appendChild(svg('text', {
+    x: 2, y: 11, fill: 'var(--ink-ghost)', 'font-size': 9,
+    'font-family': 'var(--mono)', 'letter-spacing': '.06em', text: 'residual'
+  }));
+  return root;
+}

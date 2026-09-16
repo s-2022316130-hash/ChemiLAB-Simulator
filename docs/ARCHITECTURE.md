@@ -19,13 +19,36 @@ validate(inputs)                -> {ok, errors}
 getInitialState(inputs)         -> Result with all calculated fields null
 run(inputs, {scenario, faults}) -> Result
 getDiagnostics(result)          -> Message[]
-getEquipmentState(result)       -> { tag: {state, alarm, values{}} }
+getEquipmentState(result)       -> { tag: {state, alarm, values{}, metrics{}} }
 getStreams(result)              -> Stream[]  ({id, flow, phase, label, velocity?})
 getSteps(result)                -> CalcStep[] for "show calculation"
 ```
 
 `KIND` tags every displayed quantity with its provenance: user input, calculated,
 first-principles, correlation, educational approximation, reference value.
+
+Three optional channels sit alongside the required ones. All are additive: an engine
+that omits one loses that feature, not the run.
+
+`Result.convergence` is a `Trace[]`, one per solver the run used — `{id, label, what,
+tol, history, converged, iterations, residual}`. `history` is the residual after each
+iteration; `what` is the engine saying what that residual physically measures, because
+the solver cannot know. Build one with `trace()` in `solver.js`. Gas processing reports
+two, because two flashes at two temperatures are two separate questions and one averaged
+number hides whichever was the awkward one.
+
+`metrics` on an equipment entry holds numbers where `values` holds strings. They are not
+redundant: `values` is formatted for reading and carries its unit inside the string,
+`metrics` is raw and can be scaled, compared and ramped. Parsing a number back out of a
+display string would be the UI deriving a process value, so the engine publishes both or
+the feature does without.
+
+`engine.colourModes` declares how a plant may be shaded — `{id, label, what, kind,
+metric, unit, domain, scale}`. Domains are fixed to the validated range of the model and
+never taken from the run: a scale that rescales itself makes every case look identical
+and two runs impossible to compare by eye. Engines declare only what they honestly have.
+Water treatment is isothermal — one raw-water temperature applies everywhere — so it has
+no temperature mode and shades by turbidity on a log ramp instead.
 
 ## State
 
@@ -85,9 +108,71 @@ says what to change.
 
 ## Solver honesty
 
-`solver.js` returns `{converged, iterations, residual, history}`. `runtime.js` maps that
-to the status lifecycle and discards superseded runs with a token counter, so a slow run
-can never overwrite a newer one.
+`solver.js` returns `{converged, iterations, residual, history}` from both `fixedPoint`
+and `bisect`. `runtime.js` maps that to the status lifecycle and discards superseded runs
+with a token counter, so a slow run can never overwrite a newer one.
+
+The residual is the verdict; `history` is the working, and the results rail plots it on a
+log scale against the tolerance. They answer different questions. Two runs can both say
+"converged" and have got there completely differently — the washwater recycle falls to
+tolerance in twelve sweeps, the ammonia loop crawls across five hundred and eighty-eight
+while the inerts build up against the purge — and only the second is a loop near the edge
+of stable. The shape also says which solver ran: successive substitution decays smoothly,
+bisection descends in steps.
+
+## Balances
+
+Several balances usually live in one `massBalance` object — a solids balance and a water
+balance are two questions asked of the same plant. Each entry carries `family` (the rows
+that sum together), `side` (`in` / `out` / `total` / `closure` / `context`), the `phase`
+it travels in, and `share`, its fraction of that family’s basis.
+
+`share` is computed in the engine. A row as a fraction of the charge is a process
+quantity like any other and the rule has no exception for arithmetic that looks easy.
+
+Every family sums to 100 % on both sides. Getting there meant publishing two terms the
+balances had always counted but never shown — washwater that is not recovered, and water
+leaving with the stack dust. Both got rows; no total was quietly adjusted to match. A
+`context` row is a breakdown of a row above it rather than another term in the sum, and
+the rail dims it accordingly.
+
+Closure stays the engine’s own figure. The rail never sums the rows and calls the
+difference an error.
+
+## Colour modes
+
+`shared/ramp.js` turns a number the engine reported into a colour and decides
+nothing else. `ui/colourMode.js` is the switch and the legend; `scene/materials.js`
+`tint()` shades the 3D, `flowsheet/view2d.js` `setNodeTint()` shades the diagram,
+and `ui/workspace.js` drives both from one map so the two drawings of one solved
+state can never disagree.
+
+The ramp has no green in it. Green already means running here, and a ramp that
+borrowed it would say "healthy" halfway up a temperature scale. Status stays on
+the flowsheet outline and the lamp while the ramp is only ever a fill, so a hot
+unit that has also tripped shows a red ring around a warm body and neither fact
+displaces the other.
+
+Tinting the 3D is harder than setting a colour, for three reasons worth knowing
+before touching `tint()`:
+
+- The palette is shared. Every vessel points at one `MAT` entry, so the first
+  tint on a mesh clones its material and keeps the shared one by reference —
+  by reference, so a theme change that rewrites the palette still reaches the
+  base the tint is mixed from.
+- After that first clone the material is never swapped again, only mutated.
+  `highlight()` swaps materials too, and two mechanisms swapping one slot from
+  different directions is how a hover ends up permanently amber.
+- Named meshes are skipped. A name is how a plant module reaches the parts it
+  drives from engine results, and those already carry a meaning of their own.
+
+`compact()` fuses meshes within an equipment group and never across tags, which
+is what makes per-unit tinting possible at all. Cost is one clone per mesh on
+first use and nothing per frame: measured frame time is unchanged between a
+shaded plant and an unshaded one.
+
+A unit with no reading is left unshaded and the legend says so. A compressor the
+model gives no temperature is not a cold compressor.
 
 ## Design system
 
