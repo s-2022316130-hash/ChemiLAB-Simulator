@@ -107,6 +107,15 @@
   --stream-gas:#b388fb;  --stream-steam:#c3d0e2;
   --stream-air:#3ad6c4;  --stream-solid:#ffb648; --stream-slurry:#c99266;
 
+  /* Colour-mode ramp. Cool to warm through a neutral, and deliberately with no
+     green in it: green already means running in this interface, and a ramp that
+     borrowed it would say "healthy" halfway up a temperature scale. Status
+     stays on the outline and the lamp; the ramp is only ever a fill, so the two
+     never have to be told apart by hue alone. Read by shared/ramp.js. */
+  --ramp-1:#3f6fe0; --ramp-2:#2ea9c9; --ramp-3:#cfc9bb;
+  --ramp-4:#e8873c; --ramp-5:#d94b45;
+  --ramp-none:#5d6878;   /* no reading for this unit — not a low reading */
+
   /* --- 6  scene ------------------------------------------------------------
      Read by scene/env.js and scene/renderer.js at build and on every theme
      change. A night plot: deep sky, cool ground, a warm key light and enough
@@ -261,6 +270,11 @@
   --stream-liq:#0b76c4; --stream-liquid:#0b76c4;
   --stream-gas:#7b3fd4; --stream-steam:#5b6b82;
   --stream-air:#0a8f83; --stream-solid:#b06a09; --stream-slurry:#8a6038;
+
+  /* The same ramp, carrying further against a white ground. */
+  --ramp-1:#2c53c4; --ramp-2:#1a86a8; --ramp-3:#9a9285;
+  --ramp-4:#c96a20; --ramp-5:#b8332e;
+  --ramp-none:#98a3b2;
 
   /* Overcast daylight: a high soft key, a bright sky bounce, almost no bloom.
      Bloom on a white page is haze, not light. */

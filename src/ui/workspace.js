@@ -17,6 +17,9 @@ import { createScenarioPanel } from './scenarioPanel.js';
 import { createCaseBar } from './caseBar.js';
 import { createRunHistory } from './runHistory.js';
 import { createModeSwitch } from './modeSwitch.js';
+import { createColourMode } from './colourMode.js';
+import { colourFor } from '../shared/ramp.js';
+import { onThemeChange } from '../shared/theme.js';
 import { createHud } from './hud.js';
 import { createSheet } from './sheet.js';
 import { signature } from '../shared/components/signature.js';
@@ -123,6 +126,11 @@ export function mountWorkspace(root, sim) {
 
   // ---- 3D -------------------------------------------------------------
   let view = null, streams = null, presets = null, stopPerf = null, hud = null;
+  let colourMode = null, offTheme = null;
+  // Re-shading needs the current result and both views, and the views are built
+  // further down. The hook is replaced once they exist; until then a colour-mode
+  // click during construction does nothing rather than throwing.
+  let repaintTint = () => {};
   if (webglAvailable() && sim.plant) {
     view = createPlantView(host3d, {
       onSelect: tag => store.set({ selection: tag }),
@@ -200,6 +208,21 @@ export function mountWorkspace(root, sim) {
       perf.title = `${view.workMs.toFixed(1)} ms of render work per frame, held at ${view.tier} quality`;
     }, 700);
     stopPerf = () => clearInterval(tick);
+
+    // What colour means. The switch joins the other view controls in the
+    // toolbar; the scale goes to the bottom-left corner of the viewport, where a
+    // legend belongs and where it is not fighting the toolbar for the same
+    // corner on a narrow canvas. The modes come from the engine — an interface
+    // that assembled its own list would have to offer temperature on a plant
+    // that is isothermal, and then either grey it out or invent a number.
+    colourMode = createColourMode(sim.engine.colourModes, () => repaintTint());
+    if (colourMode) {
+      // Before the frame-rate readout, not after it: the readout is a status line
+      // and status lines sit at the end of a bar, not in the middle of it.
+      capBar.insertBefore(el('span', { class: 'sep' }), detail.nextSibling);
+      capBar.insertBefore(colourMode.pills, detail.nextSibling.nextSibling);
+      host3d.appendChild(colourMode.legend);
+    }
   } else {
     host3d.appendChild(el('div', { class: 'empty', style: 'height:100%;align-content:center' }, [
       el('div', { class: 'glyph', html: icon('cube') }),
@@ -289,6 +312,34 @@ export function mountWorkspace(root, sim) {
     }
   }
 
+  /**
+   * Shade both views by the current colour mode.
+   *
+   * One map drives the plant and the diagram together. They are two drawings of
+   * one solved state, and a temperature that showed on the vessel but not on the
+   * symbol would make the reader work out which of the two to believe.
+   *
+   * Nothing is shaded without a usable result. Before a run there is no reading
+   * to shade by, and a plant left in last run’s colours would be reporting a case
+   * that is no longer on screen.
+   */
+  function tintViews(eq, usable) {
+    const mode = colourMode?.mode;
+    const map = usable && mode?.kind === 'scale' ? colourFor(mode, eq) : {};
+    view?.setEquipmentTint?.(map);
+    flowsheet?.setNodeTint?.(map);
+  }
+  repaintTint = () => {
+    const s = store.get();
+    const usable = s.status === Status.COMPLETE || s.status === Status.WARNING;
+    tintViews(usable ? sim.engine.getEquipmentState(s.result) : {}, usable);
+  };
+
+  // The ramp is read from the design tokens, and both ends of it move with the
+  // theme — so the legend and the plant have to be mixed again, not just
+  // redrawn.
+  offTheme = onThemeChange(() => { colourMode?.refresh(); repaintTint(); });
+
   store.subKeys(['selection'], paintSelection);
   store.subKeys(['hover'], s => flowsheet?.hover(s.hover));
   store.subKeys(['result', 'status'], s => {
@@ -299,6 +350,7 @@ export function mountWorkspace(root, sim) {
     view?.setEquipmentValues?.(eq);
     streams?.update(usable ? Object.fromEntries(st.map(x => [x.id, x])) : {});
     sim.plant?.applyState?.(eq, st);
+    tintViews(eq, usable);
     // The HUD is a view of the same state and has to move with it.
     if (s.selection) hud?.show(s.selection, sim.equipmentInfo?.[s.selection], eq[s.selection] || null);
     // A run that produced a result describes the inputs that produced it.
@@ -322,7 +374,8 @@ export function mountWorkspace(root, sim) {
   return {
     store, runtime,
     dispose() {
-      stopPerf?.(); streams?.dispose?.(); view?.dispose(); flowsheet?.dispose();
+      stopPerf?.(); offTheme?.(); colourMode?.dispose(); streams?.dispose?.();
+      view?.dispose(); flowsheet?.dispose();
       hud?.dispose(); sheet.dispose(); clear(root);
     }
   };

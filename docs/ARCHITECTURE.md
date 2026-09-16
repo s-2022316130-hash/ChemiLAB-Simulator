@@ -139,6 +139,41 @@ the rail dims it accordingly.
 Closure stays the engine’s own figure. The rail never sums the rows and calls the
 difference an error.
 
+## Colour modes
+
+`shared/ramp.js` turns a number the engine reported into a colour and decides
+nothing else. `ui/colourMode.js` is the switch and the legend; `scene/materials.js`
+`tint()` shades the 3D, `flowsheet/view2d.js` `setNodeTint()` shades the diagram,
+and `ui/workspace.js` drives both from one map so the two drawings of one solved
+state can never disagree.
+
+The ramp has no green in it. Green already means running here, and a ramp that
+borrowed it would say "healthy" halfway up a temperature scale. Status stays on
+the flowsheet outline and the lamp while the ramp is only ever a fill, so a hot
+unit that has also tripped shows a red ring around a warm body and neither fact
+displaces the other.
+
+Tinting the 3D is harder than setting a colour, for three reasons worth knowing
+before touching `tint()`:
+
+- The palette is shared. Every vessel points at one `MAT` entry, so the first
+  tint on a mesh clones its material and keeps the shared one by reference —
+  by reference, so a theme change that rewrites the palette still reaches the
+  base the tint is mixed from.
+- After that first clone the material is never swapped again, only mutated.
+  `highlight()` swaps materials too, and two mechanisms swapping one slot from
+  different directions is how a hover ends up permanently amber.
+- Named meshes are skipped. A name is how a plant module reaches the parts it
+  drives from engine results, and those already carry a meaning of their own.
+
+`compact()` fuses meshes within an equipment group and never across tags, which
+is what makes per-unit tinting possible at all. Cost is one clone per mesh on
+first use and nothing per frame: measured frame time is unchanged between a
+shaded plant and an unshaded one.
+
+A unit with no reading is left unshaded and the legend says so. A compressor the
+model gives no temperature is not a cold compressor.
+
 ## Design system
 
 `shared/tokens.css` holds every colour, elevation, radius, type step and duration in

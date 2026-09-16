@@ -955,6 +955,64 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 }
 .canvas-presets .cam:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
+/* "Shade by" — the colour-mode switch, and its legend.
+
+   The switch is a control, so it joins the other view controls in the toolbar.
+   The legend is a legend, so it goes to the bottom-left corner of the viewport
+   where drawing tools have put one for forty years — and, more practically,
+   where it is not fighting the toolbar for the same corner on a narrow canvas.
+
+   The toolbar may now wrap. Five controls and a readout will not fit on one
+   line of a 370 px canvas, and a second line is better than a clipped one. */
+.canvas-toolbar{flex-wrap:wrap;justify-content:flex-end;row-gap:2px}
+.cmode-pills{flex-wrap:nowrap}
+
+/* `display:flex` on a class outranks the user agent's `[hidden]{display:none}`,
+   so the attribute has to be honoured explicitly or the legend goes on
+   describing a scale that is no longer being used. */
+.cmode-legend[hidden]{display:none}
+.cmode-legend{
+  position:absolute;left:9px;bottom:52px;z-index:4;
+  display:flex;flex-direction:column;gap:3px;
+  padding:6px 8px 7px;border-radius:var(--r-sm);
+  width:148px;max-width:calc(100% - 18px);
+  background:var(--surface-glass);
+  -webkit-backdrop-filter:saturate(1.5) blur(14px);backdrop-filter:saturate(1.5) blur(14px);
+  border:1px solid var(--line);box-shadow:var(--sh-2), var(--edge);
+}
+.cmode-title{
+  font-family:var(--mono);font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink-ghost);
+}
+.cmode-track{height:6px;border-radius:3px;overflow:hidden;border:1px solid var(--line)}
+.cmode-bar{display:block;height:100%;width:100%}
+.cmode-ends{display:flex;justify-content:space-between;gap:8px;position:relative}
+.cmode-end{
+  font-family:var(--mono);font-size:9px;color:var(--ink-dim);
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+/* A log ramp has to say so: the gap between two units on one is a ratio, not a
+   difference, and a reader who assumes otherwise misreads the middle of the
+   plant by an order of magnitude. */
+.cmode-legend[data-log="true"] .cmode-ends::after{
+  content:"log";font-family:var(--mono);font-size:8px;letter-spacing:.1em;
+  color:var(--ink-ghost);position:absolute;left:50%;transform:translateX(-50%);
+}
+.cmode-none{display:flex;align-items:center;gap:5px;margin-top:1px}
+.cmode-none i{width:8px;height:8px;border-radius:2px;flex:0 0 auto;border:1px solid var(--line)}
+.cmode-none span{font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;color:var(--ink-ghost)}
+
+/* On a phone the plant is small and the legend gives up everything but the
+   scale itself. */
+@media (max-width:640px){
+  .cmode-legend{width:124px;padding:5px 6px 6px;bottom:48px}
+  .cmode-none{display:none}
+}
+
+/* A tinted symbol carries its reading as the fill, leaving the outline free to
+   go on carrying the running state. */
+.fs-node[data-tinted="true"] .fs-body{transition:fill var(--dur-3) var(--ease)}
+
 /* Live frame-rate and quality readout. */
 .perf{
   font-family:var(--mono);font-size:9px;letter-spacing:.06em;color:var(--ink-ghost);
@@ -1711,6 +1769,20 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   .legend{left:8px;bottom:6px;font-size:8.5px;gap:8px;padding:4px 8px}
   .canvas-toolbar{top:8px;right:8px;left:auto}
   .canvas-toolbar .btnrow,.canvas-toolbar .perf,.canvas-toolbar .sep{display:none!important}
+  /* Which captions to show and how fast the frame is are details a phone can do
+     without. What colour means is not: the legend is on screen saying
+     "Temperature", and hiding the only control that set it would leave the
+     reader looking at a scale they cannot change or turn off. It keeps its own
+     row, scrolling sideways rather than wrapping. */
+  /* Left-aligned, unlike the rest of this right-anchored bar: a row that both
+     scrolls and is pushed right starts scrolled past its own first item, and
+     "unning state" is not a label. */
+  .canvas-toolbar .cmode-pills{
+    display:flex!important;flex:1 0 100%;justify-content:flex-start;
+    overflow-x:auto;scrollbar-width:none;
+  }
+  .canvas-toolbar .cmode-pills::-webkit-scrollbar{height:0}
+  .canvas-toolbar .cmode-pills .btn{flex:0 0 auto}
   .hud{left:8px;top:8px;width:min(200px,calc(100% - 16px));padding:8px 9px}
 }
 @media (max-width:400px){

@@ -351,6 +351,29 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
     },
     hover(tag) { nodeEls.forEach((n, t) => n.g.classList.toggle('hov', t === tag)); },
 
+    /**
+     * Shade the symbols by a colour mode: `{tag: '#rrggbb' | null}`.
+     *
+     * The fill takes the reading; the outline and the lamp go on carrying the
+     * running state. Keeping them on separate channels is what makes the two
+     * readable at once — a hot unit that has also tripped shows a red ring
+     * around a warm body, and neither fact has to displace the other.
+     *
+     * A tag with no reading keeps the resting fill rather than taking the cold
+     * end of the ramp. A compressor the model gives no temperature is not a
+     * cold compressor.
+     */
+    setNodeTint(map) {
+      const m = map || {};
+      nodeEls.forEach((n, tag) => {
+        const b = n.g.querySelector('.fs-body');
+        if (!b) return;
+        const c = m[tag];
+        b.setAttribute('fill', c || 'var(--bg-1)');
+        n.g.dataset.tinted = String(!!c);
+      });
+    },
+
     /** streams: engine.getStreams() result; equipment: engine.getEquipmentState() */
     applyState(streams = [], equipment = {}) {
       for (const s of streams) {
