@@ -20,7 +20,7 @@
 import { KIND, Status } from '../../simulation/contract.js';
 import { rules, validate as validateSpec } from '../../shared/validation.js';
 import { U } from '../../shared/units.js';
-import { bisect } from '../../simulation/solver.js';
+import { bisect, trace } from '../../simulation/solver.js';
 
 // ---------------------------------------------------------------------------
 // Shared identity between engine, plant.js (userData.tag) and flowsheet.js.
@@ -622,6 +622,18 @@ function finishDryer(x, s, fx) {
 // ---------------------------------------------------------------------------
 const field = (label, value, unit, digits = 2, kind = KIND.CALC) => ({ label, value, unit, digits, kind });
 
+/**
+ * A balance entry: a reading, plus where it sits in the balance it belongs to.
+ * `family` groups the rows that sum together, `side` orients them, `phase` names
+ * the stream the quantity rides in. `share` is worked out here and not on the
+ * results rail — a row as a fraction of the charge is a process quantity like
+ * any other. See contract.js.
+ */
+const bal = (f, side, family, phase, basis) => ({
+  ...f, side, family, phase,
+  share: Number.isFinite(f.value) && Number.isFinite(basis) && basis > 0 ? f.value / basis : null
+});
+
 function buildResults(s, x, fx) {
   const running = s.dryFeed > 0 && s.G > 0 && s.tau > 0;
   const only = v => (running && Number.isFinite(v) ? v : null);
@@ -674,21 +686,28 @@ function buildResults(s, x, fx) {
     thermalEfficiency: field('Thermal efficiency', pctOf(s.thermalEfficiency), U.pct, 1)
   };
 
+  // Everything each balance is read against. Water is charged from two places —
+  // the feed and the ambient air — so its basis is the total, not the feed.
+  const waterBasis = only(s.waterIn), solidsBasis = only(s.solidsIn);
+
   const massBalance = {
-    wetFeed: field('Wet feed in', only(s.dryFeed * (1 + x.moistureIn)), U.massFlow, 1),
-    dryySolidsIn: field('Bone-dry solids in', only(s.solidsIn), U.massFlow, 1),
-    waterInFeed: field('Water in with the solids', only(s.waterIn - s.waterInAir), U.massFlow, 1),
-    waterInAir: field('Water in with the ambient air', only(s.waterInAir), U.massFlow, 2),
-    totalWaterIn: field('Total water in', only(s.waterIn), U.massFlow, 1),
-    waterToAir: field('Water leaving in the exhaust', only(s.waterOutAir), U.massFlow, 1),
-    waterInProduct: field('Water leaving with the product', only(s.waterOutProduct), U.massFlow, 2),
-    totalWaterOut: field('Total water out', only(s.waterOut), U.massFlow, 1),
-    waterClosure: field('Water balance closure error', pctOf(s.waterClosure), U.pct, 4),
-    productSolids: field('Solids recovered as product', only(s.recoveredProduct), U.massFlow, 2),
-    cycloneCatch: field('Solids recovered by the cyclone', only(s.cycloneCatch), U.massFlow, 3),
-    bagCatch: field('Solids recovered by the bag filter', only(s.bagCatch), U.massFlow, 4),
-    stackLoss: field('Solids lost to the stack', only(s.stackDust), U.massFlow, 4),
-    solidsClosure: field('Solids balance closure error', pctOf(s.solidsClosure), U.pct, 4)
+    wetFeed: bal(field('Wet feed in', only(s.dryFeed * (1 + x.moistureIn)), U.massFlow, 1), 'context', 'solids', 'solid', null),
+    dryySolidsIn: bal(field('Bone-dry solids in', only(s.solidsIn), U.massFlow, 1), 'in', 'solids', 'solid', solidsBasis),
+    productSolids: bal(field('Solids recovered as product', only(s.recoveredProduct), U.massFlow, 2), 'out', 'solids', 'solid', solidsBasis),
+    stackLoss: bal(field('Solids lost to the stack', only(s.stackDust), U.massFlow, 4), 'out', 'solids', 'gas', solidsBasis),
+    cycloneCatch: bal(field('— of which recovered by the cyclone', only(s.cycloneCatch), U.massFlow, 3), 'context', 'solids', 'solid', solidsBasis),
+    bagCatch: bal(field('— of which recovered by the bag filter', only(s.bagCatch), U.massFlow, 4), 'context', 'solids', 'solid', solidsBasis),
+    solidsClosure: bal(field('Solids balance closure error', pctOf(s.solidsClosure), U.pct, 4), 'closure', 'solids', '', null),
+    waterInFeed: bal(field('Water in with the solids', only(s.waterIn - s.waterInAir), U.massFlow, 1), 'in', 'water', 'solid', waterBasis),
+    waterInAir: bal(field('Water in with the ambient air', only(s.waterInAir), U.massFlow, 2), 'in', 'water', 'air', waterBasis),
+    totalWaterIn: bal(field('Total water in', only(s.waterIn), U.massFlow, 1), 'total', 'water', '', waterBasis),
+    waterToAir: bal(field('Water leaving in the exhaust', only(s.waterOutAir), U.massFlow, 1), 'out', 'water', 'gas', waterBasis),
+    waterInProduct: bal(field('Water leaving with the product', only(s.waterOutProduct), U.massFlow, 2), 'out', 'water', 'solid', waterBasis),
+    // The third term of waterOut. The balance has always counted it; it simply
+    // had no row, so the rows on screen did not add up to the total above them.
+    waterInDust: bal(field('Water leaving with the stack dust', only(s.waterOutDust), U.massFlow, 4), 'out', 'water', 'gas', waterBasis),
+    totalWaterOut: bal(field('Total water out', only(s.waterOut), U.massFlow, 1), 'total', 'water', '', waterBasis),
+    waterClosure: bal(field('Water balance closure error', pctOf(s.waterClosure), U.pct, 4), 'closure', 'water', '', null)
   };
 
   const energyBalance = {
@@ -975,6 +994,51 @@ function equipmentFrom(s, x, fx) {
     ...run(false), load: off ? 0 : clamp(s.totalPower / 200, 0, 1),
     values: { 'Total electrical': fmt(s.totalPower, 2, U.powerKW), 'Heater duty': fmt(s.heaterDutyKW, 1, U.powerKW) }
   };
+  // Numeric companions to the display strings above — the same readings held as
+  // numbers, so they can be scaled and compared rather than only read. The
+  // strings in `values` carry their units inside them, and parsing a number
+  // back out of one would be the interface deriving a process value. See
+  // contract.js.
+  //
+  // A dryer is a machine for moving heat into water, so it has two honest
+  // gradients running through it and they run opposite ways: the gas cools from
+  // the heater to the stack, and the solids warm from the feed to the drum and
+  // are then cooled again. Each unit reports the temperature of whatever is
+  // passing through it, not an average of the two.
+  const tempAt = {
+    [TAGS.feedHopper]: x.solidTempIn,
+    [TAGS.feedScrew]: x.solidTempIn,
+    [TAGS.supplyFan]: x.ambientTemp,
+    [TAGS.heater]: x.airTempIn,
+    [TAGS.drum]: s.tAirOut,
+    [TAGS.cyclone]: s.tAirOut,
+    [TAGS.bagFilter]: s.tAirOut,
+    [TAGS.exhaustFan]: s.tAirOut,
+    [TAGS.stack]: s.tAirOut,
+    [TAGS.productScrew]: s.tSolidOut,
+    [TAGS.cooler]: s.productTempCooled,
+    [TAGS.productBin]: s.productTempCooled,
+    [TAGS.mcc]: NaN
+  };
+  // Moisture belongs to the solids. The gas train carries water too, but as
+  // humidity in a different unit against a different basis, and colouring both
+  // from one scale would be comparing two quantities that do not compare.
+  const moistureAt = {
+    [TAGS.feedHopper]: x.moistureIn,
+    [TAGS.feedScrew]: x.moistureIn,
+    [TAGS.drum]: s.xOut,
+    [TAGS.productScrew]: s.xOut,
+    [TAGS.cooler]: s.xOut,
+    [TAGS.productBin]: s.xOut
+  };
+  const only1 = v => (off || !Number.isFinite(v) ? null : v);
+  for (const [tag, e] of Object.entries(eq)) {
+    e.metrics = {
+      tempC: only1(tempAt[tag]),
+      moisture: only1(moistureAt[tag]),
+      load: only1(e.load ?? e.duty)
+    };
+  }
   return eq;
 }
 
@@ -1030,14 +1094,14 @@ function getInitialState(inputs = {}) {
   const s0 = solveDryer(blank, { xOut: blank.moistureIn ?? 0 }, fx);
   const built = buildResults(finishDryer(blank, s0, fx), blank, fx);
   const nulls = obj => Object.fromEntries(Object.entries(obj).map(([k, v]) =>
-    [k, { ...v, value: v.kind === KIND.REF ? v.value : null }]));
+    [k, { ...v, value: v.kind === KIND.REF ? v.value : null, ...(v.share === undefined ? {} : { share: null }) }]));
   return {
     status: Status.READY, converged: false, iterations: null, residual: null,
     reason: 'Not calculated — set the operating conditions and run the simulation.',
     kpis: built.kpis.map(k => ({ ...k, value: null })),
     results: nulls(built.results), massBalance: nulls(built.massBalance),
     energyBalance: nulls(built.energyBalance), quality: nulls(built.quality),
-    charts: [], messages: [], diagnostics: [], streams: [], equipment: {}, steps: []
+    charts: [], messages: [], diagnostics: [], streams: [], equipment: {}, steps: [], convergence: []
   };
 }
 
@@ -1058,10 +1122,21 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
   const rootFound = solve.x !== null && finalResidual < 1e-7;
   const s = finishDryer(eff, solveDryer(eff, { xOut: solve.x ?? eff.moistureIn }, fx), fx);
 
+  // The trace carries this engine's own verdict rather than the solver's,
+  // because this engine does not take the solver's word for it: bisection stops
+  // when the bracket collapses as well as when the tolerance is met, and the
+  // check above is what decides which of those happened.
+  const convergence = [trace(
+    'moisture',
+    'Coupled moisture and enthalpy balance',
+    'How far the outlet moisture that comes out of the drum model is from the outlet moisture that was fed into it, in kg water per kg bone-dry solid. It reaches zero when one guess reproduces itself, which closes the moisture balance, the enthalpy balance and the drum heat transfer at the same time.',
+    1e-7, { ...solve, converged: rootFound, residual: finalResidual }
+  )].filter(Boolean);
+
   if (!rootFound) {
     return {
       ...getInitialState(inputs), status: Status.ERROR, converged: false,
-      iterations: solve.iterations, residual: finalResidual,
+      iterations: solve.iterations, residual: finalResidual, convergence,
       reason: 'Coupled moisture and enthalpy balance did not converge',
       messages: [],
       diagnostics: [...notes.map(text => ({ level: 'warning', text })), {
@@ -1083,7 +1158,7 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
   if (infeasible.length) {
     return {
       ...getInitialState(inputs), status: Status.ERROR,
-      converged: rootFound, iterations: solve.iterations, residual: finalResidual,
+      converged: rootFound, iterations: solve.iterations, residual: finalResidual, convergence,
       reason: 'No physically operable state at these conditions',
       messages: [],
       diagnostics: [...notes.map(text => ({ level: 'warning', text })),
@@ -1098,18 +1173,43 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
   return {
     status: hasIssue ? Status.WARNING : Status.COMPLETE,
     converged: rootFound, iterations: solve.iterations, residual: finalResidual,
-    reason: scenario, ...built,
+    convergence, reason: scenario, ...built,
     messages: [], diagnostics,
     streams: streamsFrom(s, eff), equipment: equipmentFrom(s, eff, fx),
     steps: buildSteps(s, eff, fx), state: s
   };
 }
 
+/**
+ * How this plant may be shaded. The domains are fixed to the validated range of
+ * the model rather than stretched to fit the run: a scale that rescales itself
+ * makes every case look equally hot and makes two runs impossible to compare by
+ * eye, which is the one thing a colour mode is for.
+ */
+const colourModes = [
+  {
+    id: 'state', label: 'Running state', kind: 'state',
+    what: 'Each unit in the colour of what it is doing — running, warning, tripped or stopped. This is what colour has meant here all along.'
+  },
+  {
+    id: 'thermal', label: 'Temperature', kind: 'scale',
+    metric: 'tempC', unit: U.tempC,
+    domain: [inputSpec.ambientTemp.min, inputSpec.airTempIn.max], scale: 'linear', digits: 0,
+    what: 'The temperature of whatever is passing through each unit. Two gradients run through a dryer and they run opposite ways — the gas cools from the heater to the stack while the solids warm from the feed to the drum — so each unit reports its own stream rather than an average of the two.'
+  },
+  {
+    id: 'moisture', label: 'Solids moisture', kind: 'scale',
+    metric: 'moisture', unit: U.moisture,
+    domain: [0, inputSpec.moistureIn.max], scale: 'linear', digits: 3,
+    what: 'Water carried by the solids, dry basis, as they pass each unit. Only the solids train has a reading: the gas carries water too, but as humidity against a different basis, and one ramp across both would be comparing quantities that do not compare.'
+  }
+];
+
 export default {
   id: 'industrial-dryer',
   modelVersion: '1.0.0',
   inputSpec, assumptions, equations,
-  TAGS, STREAMS, FAULT_IDS, REF,
+  TAGS, STREAMS, FAULT_IDS, REF, colourModes,
   validate,
   getInitialState,
   run,

@@ -32,25 +32,57 @@ function blend(x, xn, r) {
  */
 export function bisect(f, lo, hi, { tol = 1e-6, maxIter = 80, xtol = null } = {}) {
   const xEps = xtol ?? Math.max(Math.abs(lo), Math.abs(hi), 1) * 1e-14;
+  // |f| after each evaluation the search actually used, so the approach to the
+  // root can be shown rather than summarised by its last value. It costs one
+  // push per iteration and it is the difference between "converged in 41" and
+  // seeing that the residual fell like a stone and then sat on a shelf.
+  const history = [];
   let flo = f(lo), fhi = f(hi);
   // A root sitting exactly on an endpoint is still a root. Without these two checks
   // the sign test below cannot bracket it — flo*fm is zero rather than negative — so
   // the interval walks away from the answer and reports a residual it never met.
-  if (Math.abs(flo) < tol) return { x: lo, converged: true, iterations: 0, residual: Math.abs(flo) };
-  if (Math.abs(fhi) < tol) return { x: hi, converged: true, iterations: 0, residual: Math.abs(fhi) };
-  if (flo * fhi > 0) return { x: null, converged: false, iterations: 0, residual: null, reason: 'No sign change on the bracket — the specification is outside the feasible range of this model.' };
+  if (Math.abs(flo) < tol) return { x: lo, converged: true, iterations: 0, residual: Math.abs(flo), history: [Math.abs(flo)] };
+  if (Math.abs(fhi) < tol) return { x: hi, converged: true, iterations: 0, residual: Math.abs(fhi), history: [Math.abs(fhi)] };
+  if (flo * fhi > 0) return { x: null, converged: false, iterations: 0, residual: null, history, reason: 'No sign change on the bracket — the specification is outside the feasible range of this model.' };
   let mid = lo, i = 0;
   for (; i < maxIter; i++) {
     mid = 0.5 * (lo + hi); const fm = f(mid);
+    history.push(Math.abs(fm));
     // The bracket collapsing is a reason to stop, but it is not on its own a reason to
     // claim convergence: a discontinuous residual can pinch to nothing while still
     // sitting far from zero. Only the tolerance actually being met counts.
     if (Math.abs(fm) < tol || (hi - lo) / 2 < xEps) {
-      return { x: mid, converged: Math.abs(fm) < tol, iterations: i + 1, residual: Math.abs(fm) };
+      return { x: mid, converged: Math.abs(fm) < tol, iterations: i + 1, residual: Math.abs(fm), history };
     }
     if (flo * fm <= 0) { hi = mid; fhi = fm; } else { lo = mid; flo = fm; }
   }
-  return { x: mid, converged: false, iterations: i, residual: Math.abs(f(mid)) };
+  return { x: mid, converged: false, iterations: i, residual: Math.abs(f(mid)), history };
+}
+
+/**
+ * A convergence trace, in the shape `Result.convergence` carries.
+ *
+ * The solver knows the numbers; only the engine knows what they mean. Rather
+ * than let five engines each invent a slightly different object, they call this
+ * and supply the two things the solver cannot know: what was being iterated and
+ * what its residual measures. `tol` is passed in rather than read back off the
+ * solve because a solver is not obliged to remember what it was asked for, and
+ * a tolerance line drawn from a guess would be worse than no line.
+ *
+ * A solve with no history — an analytic branch, or a root sitting on an
+ * endpoint — returns a trace with an empty history rather than nothing at all.
+ * "Solved without iterating" is a real answer and the rail should be able to
+ * say it.
+ */
+export function trace(id, label, what, tol, solve) {
+  if (!solve) return null;
+  return {
+    id, label, what, tol,
+    history: Array.isArray(solve.history) ? solve.history.filter(Number.isFinite) : [],
+    converged: solve.converged === true,
+    iterations: Number.isFinite(solve.iterations) ? solve.iterations : null,
+    residual: Number.isFinite(solve.residual) ? solve.residual : null
+  };
 }
 export const statusFromSolve = (s, hasWarn) =>
   !s.converged ? Status.ERROR : hasWarn ? Status.WARNING : Status.COMPLETE;

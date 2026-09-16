@@ -34,7 +34,7 @@
 import { KIND, Status } from '../../simulation/contract.js';
 import { rules, validate as validateSpec } from '../../shared/validation.js';
 import { U } from '../../shared/units.js';
-import { bisect } from '../../simulation/solver.js';
+import { bisect, trace } from '../../simulation/solver.js';
 
 // ---------------------------------------------------------------------------
 // Shared identity between engine, plant.js (userData.tag) and flowsheet.js.
@@ -167,17 +167,20 @@ export function rachfordRice(z, K) {
   const f0 = f(0), f1 = f(1);
   // Outside the two-phase region there is no root to find, and saying so is
   // more useful than returning a number from the middle of the bracket.
-  if (f0 <= 0) return { beta: 0, phase: 'liquid', converged: true, iterations: 0, residual: Math.abs(f0) };
-  if (f1 >= 0) return { beta: 1, phase: 'vapour', converged: true, iterations: 0, residual: Math.abs(f1) };
+  // A single-phase answer is a real answer arrived at without iterating, and it
+  // reports an empty history rather than nothing: "no iteration was needed" and
+  // "nobody recorded what happened" are different facts.
+  if (f0 <= 0) return { beta: 0, phase: 'liquid', converged: true, iterations: 0, residual: Math.abs(f0), history: [] };
+  if (f1 >= 0) return { beta: 1, phase: 'vapour', converged: true, iterations: 0, residual: Math.abs(f1), history: [] };
   const s = bisect(f, 0, 1, { tol: 1e-12, maxIter: 200, xtol: 1e-14 });
-  if (s.x === null) return { beta: null, phase: 'none', converged: false, iterations: s.iterations, residual: null };
-  return { beta: s.x, phase: 'two', converged: s.converged, iterations: s.iterations, residual: s.residual };
+  if (s.x === null) return { beta: null, phase: 'none', converged: false, iterations: s.iterations, residual: null, history: s.history };
+  return { beta: s.x, phase: 'two', converged: s.converged, iterations: s.iterations, residual: s.residual, history: s.history };
 }
 
 /** Split a feed into vapour and liquid at the given conditions. */
 export function flash(feed, tempK, pressureBar) {
   const total = sum(feed);
-  if (!(total > 0)) return { vapour: scale(feed, 0), liquid: scale(feed, 0), beta: 1, solve: { converged: true, iterations: 0, residual: 0 } };
+  if (!(total > 0)) return { vapour: scale(feed, 0), liquid: scale(feed, 0), beta: 1, solve: { converged: true, iterations: 0, residual: 0, history: [] } };
   const z = scale(feed, 1 / total);
   const K = Object.fromEntries(KEYS.map(k => [k, wilsonK(k, tempK, pressureBar)]));
   const solve = rachfordRice(z, K);
@@ -828,6 +831,18 @@ export const equations = [
 // Result assembly
 // ---------------------------------------------------------------------------
 const field = (label, value, unit, digits = 2, kind = KIND.CALC) => ({ label, value, unit, digits, kind });
+
+/**
+ * A balance entry: a reading, plus where it sits in the balance it belongs to.
+ * `family` groups the rows that sum together, `side` orients them, `phase` names
+ * the stream the quantity leaves in. `share` is worked out here and not on the
+ * results rail — a row as a fraction of the charge is a process quantity like
+ * any other. See contract.js.
+ */
+const bal = (f, side, family, phase, basis) => ({
+  ...f, side, family, phase,
+  share: Number.isFinite(f.value) && Number.isFinite(basis) && basis > 0 ? f.value / basis : null
+});
 const fmt = (v, d, unit) => (Number.isFinite(v) ? `${v.toFixed(d)}${unit ? ' ' + unit : ''}` : '—');
 
 function buildResults(s, x, fx) {
@@ -928,21 +943,26 @@ function buildResults(s, x, fx) {
     energyIntensity: field('Energy per unit of sales gas', only(s.energyPerMMSCFD), 'kW per MMSCFD', 0)
   };
 
+  // What each balance is read against. The molar basis is everything entering,
+  // which is the wellhead plus the water the gas picks up off the amine — not
+  // the wellhead alone.
+  const molarBasis = only(s.inTotal), carbonBasis = only(s.carbonIn);
+
   const massBalance = {
-    feedTotal: field('Wellhead in', only(s.feedTotal), U.molFlow, 1),
-    totalIn: field('Total in', only(s.inTotal), U.molFlow, 1),
-    salesOut: field('Sales gas out', only(s.salesTotal), U.molFlow, 1),
-    nglOut: field('Natural gas liquids out', only(s.nglTotal), U.molFlow, 2),
-    condensateOut: field('Condensate and free water out', only(sum(s.condensate)), U.molFlow, 2),
-    acidGasOut: field('Acid gas out', only(sum(s.acidGas)), U.molFlow, 2),
-    waterFromAmine: field('Water picked up in the amine contactor', only(s.waterFromAmine), U.molFlow, 3, KIND.FIRST),
-    coolerWater: field('Water knocked out before dehydration', only(s.coolerWater), U.molFlow, 3, KIND.FIRST),
-    glycolWaterOut: field('Water to the glycol regenerator', only(s.waterRemoved / COMP.H2O.mw), U.molFlow, 3),
-    totalOut: field('Total out', only(s.outTotal), U.molFlow, 1),
-    molarClosure: field('Molar balance closure error', pctOf(s.molarClosure), U.pct, 6),
-    carbonIn: field('Carbon in', only(s.carbonIn), U.molFlow, 1, KIND.FIRST),
-    carbonOut: field('Carbon out', only(s.carbonOut), U.molFlow, 1, KIND.FIRST),
-    carbonClosure: field('Carbon balance closure error', pctOf(s.carbonClosure), U.pct, 6)
+    feedTotal: bal(field('Wellhead in', only(s.feedTotal), U.molFlow, 1), 'in', 'molar', 'gas', molarBasis),
+    waterFromAmine: bal(field('Water picked up in the amine contactor', only(s.waterFromAmine), U.molFlow, 3, KIND.FIRST), 'in', 'molar', 'gas', molarBasis),
+    totalIn: bal(field('Total in', only(s.inTotal), U.molFlow, 1), 'total', 'molar', '', molarBasis),
+    salesOut: bal(field('Sales gas out', only(s.salesTotal), U.molFlow, 1), 'out', 'molar', 'gas', molarBasis),
+    nglOut: bal(field('Natural gas liquids out', only(s.nglTotal), U.molFlow, 2), 'out', 'molar', 'liquid', molarBasis),
+    condensateOut: bal(field('Condensate and free water out', only(sum(s.condensate)), U.molFlow, 2), 'out', 'molar', 'liquid', molarBasis),
+    acidGasOut: bal(field('Acid gas out', only(sum(s.acidGas)), U.molFlow, 2), 'out', 'molar', 'gas', molarBasis),
+    glycolWaterOut: bal(field('Water to the glycol regenerator', only(s.waterRemoved / COMP.H2O.mw), U.molFlow, 3), 'out', 'molar', 'liquid', molarBasis),
+    coolerWater: bal(field('Water knocked out before dehydration', only(s.coolerWater), U.molFlow, 3, KIND.FIRST), 'out', 'molar', 'liquid', molarBasis),
+    totalOut: bal(field('Total out', only(s.outTotal), U.molFlow, 1), 'total', 'molar', '', molarBasis),
+    molarClosure: bal(field('Molar balance closure error', pctOf(s.molarClosure), U.pct, 6), 'closure', 'molar', '', null),
+    carbonIn: bal(field('Carbon in', only(s.carbonIn), U.molFlow, 1, KIND.FIRST), 'in', 'carbon', 'gas', carbonBasis),
+    carbonOut: bal(field('Carbon out', only(s.carbonOut), U.molFlow, 1, KIND.FIRST), 'out', 'carbon', '', carbonBasis),
+    carbonClosure: bal(field('Carbon balance closure error', pctOf(s.carbonClosure), U.pct, 6), 'closure', 'carbon', '', null)
   };
 
   const energyBalance = {
@@ -1222,6 +1242,37 @@ function equipmentFrom(s, x, fx) {
       'Net shaft': fmt(s.netPower, 0, U.powerKW)
     }
   };
+  // Numeric companions to the display strings above — the same readings held as
+  // numbers so they can be scaled and compared rather than only read. See
+  // contract.js: parsing a number back out of a formatted string would be the
+  // interface deriving a process value, which it may not do.
+  //
+  // A gas plant is a temperature machine, and this is the one place in the
+  // library where shading by temperature says something no other view does: the
+  // train runs from a warm wellhead through a hot regenerator to a cold box
+  // below minus eighty, and which units sit where is the whole design. Units
+  // whose temperature the model does not establish report null and are left
+  // unshaded rather than given a plausible one.
+  const tempAt = {
+    [TAGS.inletSeparator]: x.feedTemp,
+    [TAGS.amineContactor]: x.feedTemp,
+    [TAGS.leanRichExchanger]: s.leanTemp,
+    [TAGS.aminePump]: s.leanTemp,
+    [TAGS.glycolContactor]: x.dehyTemp,
+    [TAGS.glycolRegenerator]: REF.tegReboilerTemp,
+    [TAGS.coldBox]: x.coldBoxOutlet,
+    [TAGS.expander]: s.expanderOutC,
+    [TAGS.coldSeparator]: s.expanderOutC,
+    [TAGS.demethaniser]: Number.isFinite(s.bottomK) ? s.bottomK - 273.15 : NaN,
+    [TAGS.residueCompressor]: s.dischargeTemp
+  };
+  const only1 = v => (off || !Number.isFinite(v) ? null : v);
+  for (const [tag, e] of Object.entries(eq)) {
+    e.metrics = {
+      tempC: only1(tempAt[tag]),
+      load: only1(e.load ?? e.duty)
+    };
+  }
   return eq;
 }
 
@@ -1366,15 +1417,31 @@ function getInitialState(inputs = {}) {
     ? { kpis: [], results: {}, massBalance: {}, energyBalance: {}, quality: {} }
     : buildResults(s, blank, fx);
   const nulls = obj => Object.fromEntries(Object.entries(obj).map(([k, v]) =>
-    [k, { ...v, value: v.kind === KIND.REF ? v.value : null }]));
+    [k, { ...v, value: v.kind === KIND.REF ? v.value : null, ...(v.share === undefined ? {} : { share: null }) }]));
   return {
     status: Status.READY, converged: false, iterations: null, residual: null,
     reason: 'Not calculated — set the feed and the operating conditions and run the plant.',
     kpis: (built.kpis || []).map(k => ({ ...k, value: null })),
     results: nulls(built.results || {}), massBalance: nulls(built.massBalance || {}),
     energyBalance: nulls(built.energyBalance || {}), quality: nulls(built.quality || {}),
-    charts: [], messages: [], diagnostics: [], streams: [], equipment: {}, steps: []
+    charts: [], messages: [], diagnostics: [], streams: [], equipment: {}, steps: [], convergence: []
   };
+}
+
+/**
+ * Both flashes, in the order the gas meets them. Two traces rather than one
+ * because they are two different questions: the inlet separator splits the
+ * wellhead stream at its own temperature and pressure, and the expander outlet
+ * splits a colder, leaner stream after most of the acid gas and water are gone.
+ * Averaging their residuals into one number, which is what a single figure
+ * does, would hide whichever of the two was the awkward one.
+ */
+function tracesOf(s) {
+  const what = 'The Rachford–Rice objective: the sum over components of (z·(K−1)) / (1 + β·(K−1)). It is zero at the vapour fraction β where the vapour and liquid mole fractions each add to one.';
+  return [
+    trace('inlet-flash', 'Inlet separator flash', what, 1e-12, s.inlet?.solve),
+    trace('expander-flash', 'Expander outlet flash', what, 1e-12, s.expanded?.solve)
+  ].filter(Boolean);
 }
 
 function run(inputs, { scenario = 'base', faults = [] } = {}) {
@@ -1394,6 +1461,9 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
     return {
       ...getInitialState(inputs), status: Status.ERROR, converged: false,
       iterations: s.solve?.iterations ?? null, residual: s.solve?.residual ?? null,
+      convergence: [trace('failed-flash', `The ${s.stage}`,
+        'The Rachford–Rice objective: the sum over components of (z·(K−1)) / (1 + β·(K−1)). It never reached zero, so no vapour fraction splits this stream.',
+        1e-12, s.solve)].filter(Boolean),
       reason: `The ${s.stage} did not converge`,
       messages: [],
       diagnostics: [...notes.map(text => ({ level: 'warning', text })), {
@@ -1413,6 +1483,7 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
     converged: true,
     iterations: (s.inlet.solve.iterations ?? 0) + (s.expanded.solve.iterations ?? 0),
     residual: Math.max(s.inlet.solve.residual ?? 0, s.expanded.solve.residual ?? 0),
+    convergence: tracesOf(s),
     reason: scenario, ...built,
     messages: [], diagnostics,
     streams: streamsFrom(s, eff), equipment: equipmentFrom(s, eff, fx),
@@ -1420,11 +1491,35 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
   };
 }
 
+/**
+ * How this plant may be shaded. The domain is fixed to the validated range of
+ * the model rather than stretched to fit the run: a scale that rescales itself
+ * makes every case look equally cold and makes two runs impossible to compare
+ * by eye, which is the one thing a colour mode is for.
+ */
+const colourModes = [
+  {
+    id: 'state', label: 'Running state', kind: 'state',
+    what: 'Each unit in the colour of what it is doing — running, warning, tripped or stopped. This is what colour has meant here all along.'
+  },
+  {
+    id: 'thermal', label: 'Temperature', kind: 'scale',
+    metric: 'tempC', unit: U.tempC,
+    domain: [inputSpec.coldBoxOutlet.min, REF.tegReboilerTemp], scale: 'linear', digits: 0,
+    what: 'The temperature each unit runs at, from the wellhead through the glycol reboiler to the cold box. The span of this one scale is the plant: separating the heavy ends out of a gas is done by making it cold, and paying for that with heat somewhere else.'
+  },
+  {
+    id: 'load', label: 'Duty and loading', kind: 'scale',
+    metric: 'load', unit: U.dimensionless, domain: [0, 1], scale: 'linear', digits: 2,
+    what: 'How hard each unit is working against the duty it was sized for. 1.00 is the design point rather than a limit, and units with no meaningful loading are left unshaded instead of shaded zero.'
+  }
+];
+
 export default {
   id: 'gas-processing',
   modelVersion: '1.0.0',
   inputSpec, assumptions, equations,
-  TAGS, STREAMS, FAULT_IDS, REF, COMP,
+  TAGS, STREAMS, FAULT_IDS, REF, COMP, colourModes,
   validate,
   getInitialState,
   run,

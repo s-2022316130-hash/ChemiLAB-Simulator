@@ -24,7 +24,7 @@
 import { KIND, Status } from '../../simulation/contract.js';
 import { rules, validate as validateSpec } from '../../shared/validation.js';
 import { U } from '../../shared/units.js';
-import { fixedPoint, bisect } from '../../simulation/solver.js';
+import { fixedPoint, bisect, trace } from '../../simulation/solver.js';
 
 // ---------------------------------------------------------------------------
 // Shared identity between engine, plant.js and flowsheet.js.
@@ -558,6 +558,18 @@ function energy(x, a, u) {
 // ---------------------------------------------------------------------------
 const field = (label, value, unit, digits = 2, kind = KIND.CALC) => ({ label, value, unit, digits, kind });
 
+/**
+ * A balance entry: a reading, plus where it sits in the balance it belongs to.
+ * `family` groups the rows that sum together, `side` orients them, `phase` names
+ * the stream the quantity travels in. `share` is worked out here and not on the
+ * results rail — a row as a fraction of the charge is a process quantity like
+ * any other. See contract.js.
+ */
+const bal = (f, side, family, phase, basis) => ({
+  ...f, side, family, phase,
+  share: Number.isFinite(f.value) && Number.isFinite(basis) && basis > 0 ? f.value / basis : null
+});
+
 function buildResults(s, x, fx) {
   const { a, u, e } = s;
   const running = a.feed > 0 && a.liquidNH3 > 0;
@@ -614,22 +626,36 @@ function buildResults(s, x, fx) {
     specificEnergy: field('Specific energy per tonne of product', only(e.specificEnergy), 'kWh/t', 0)
   };
 
+  // Four balances live in this object and they are written on four different
+  // bases. Only three of them close: ammonia synthesis destroys moles — four go
+  // in and two come out — so there is no molar balance across the loop to be
+  // had, and the makeup rows are marked as context rather than dressed up as
+  // one side of a sum that cannot exist.
+  const inertBasis = only(a.mu * a.yInertMu);
+  const carbonBasis = only(u.co2Feed);
+  // The nitrogen balance is written on the ammonia that actually reaches the
+  // urea plant, not on everything the separator condensed — the difference is
+  // the gas dissolved in the liquid, which leaves with the let-down. This row
+  // now carries that same quantity; before it carried the separator figure, so
+  // it disagreed with the closure printed three rows under it.
+  const nitrogenBasis = only(s.ammoniaToUrea);
+
   const massBalance = {
-    syngasIn: field('Makeup syngas in', only(a.mu), U.molFlow, 0),
-    n2In: field('Nitrogen in', only(a.mu * a.yN2Mu), U.molFlow, 1),
-    h2In: field('Hydrogen in', only(a.mu * a.yH2Mu), U.molFlow, 1),
-    inertIn: field('Inerts in', only(a.mu * a.yInertMu), U.molFlow, 2),
-    inertOut: field('Inerts out with the purge', only(a.purge * a.yVap.inert), U.molFlow, 2),
-    inertClosure: field('Inert balance closure error', only(s.inertClosure * 100), U.pct, 4),
-    ammoniaOut: field('Ammonia to the urea plant', only(a.liquidNH3), U.molFlow, 1),
-    co2In: field('Carbon dioxide in', only(u.co2Feed), U.molFlow, 1),
-    ureaOut: field('Urea out', only(u.ureaMade), U.molFlow, 1),
-    co2Vented: field('Carbon dioxide not converted', only(u.co2Lost), U.molFlow, 2),
-    carbonClosure: field('Carbon balance closure error', only(s.carbonClosure * 100), U.pct, 4),
-    nitrogenIn: field('Nitrogen atoms in as ammonia', only(a.liquidNH3), 'kmol N/h', 1),
-    nitrogenOut: field('Nitrogen atoms out in product and losses', only(s.nitrogenOut), 'kmol N/h', 1),
-    nitrogenClosure: field('Nitrogen balance closure error', only(s.nitrogenClosure * 100), U.pct, 4),
-    productOut: field('Prilled product out', only(u.productMass), 'kg/h', 0)
+    syngasIn: bal(field('Makeup syngas in', only(a.mu), U.molFlow, 0), 'in', 'syngas', 'gas', only(a.mu)),
+    n2In: bal(field('Nitrogen in', only(a.mu * a.yN2Mu), U.molFlow, 1), 'context', 'syngas', 'gas', only(a.mu)),
+    h2In: bal(field('Hydrogen in', only(a.mu * a.yH2Mu), U.molFlow, 1), 'context', 'syngas', 'gas', only(a.mu)),
+    ammoniaOut: bal(field('Ammonia to the urea plant', only(a.liquidNH3), U.molFlow, 1), 'context', 'syngas', 'liquid', only(a.mu)),
+    inertIn: bal(field('Inerts in', only(a.mu * a.yInertMu), U.molFlow, 2), 'in', 'inert', 'gas', inertBasis),
+    inertOut: bal(field('Inerts out with the purge', only(a.purge * a.yVap.inert), U.molFlow, 2), 'out', 'inert', 'gas', inertBasis),
+    inertClosure: bal(field('Inert balance closure error', only(s.inertClosure * 100), U.pct, 4), 'closure', 'inert', '', null),
+    co2In: bal(field('Carbon dioxide in', only(u.co2Feed), U.molFlow, 1), 'in', 'carbon', 'gas', carbonBasis),
+    ureaOut: bal(field('Urea out', only(u.ureaMade), U.molFlow, 1), 'out', 'carbon', 'liquid', carbonBasis),
+    co2Vented: bal(field('Carbon dioxide not converted', only(u.co2Lost), U.molFlow, 2), 'out', 'carbon', 'gas', carbonBasis),
+    carbonClosure: bal(field('Carbon balance closure error', only(s.carbonClosure * 100), U.pct, 4), 'closure', 'carbon', '', null),
+    nitrogenIn: bal(field('Nitrogen atoms in as ammonia to urea', only(s.ammoniaToUrea), 'kmol N/h', 1), 'in', 'nitrogen', 'liquid', nitrogenBasis),
+    nitrogenOut: bal(field('Nitrogen atoms out in product and losses', only(s.nitrogenOut), 'kmol N/h', 1), 'out', 'nitrogen', '', nitrogenBasis),
+    nitrogenClosure: bal(field('Nitrogen balance closure error', only(s.nitrogenClosure * 100), U.pct, 4), 'closure', 'nitrogen', '', null),
+    productOut: bal(field('Prilled product out', only(u.productMass), 'kg/h', 0), 'context', 'product', 'solid', null)
   };
 
   const energyBalance = {
@@ -941,6 +967,33 @@ function equipmentFrom(s, x, fx) {
     ...run(false), load: off ? 0 : clamp(e.totalShaft / 40000, 0, 1),
     values: { 'Total power': fmt(e.totalShaft, 0, U.powerKW), 'Specific energy': fmt(e.specificEnergy, 0, 'kWh/t') }
   };
+  // Numeric companions to the display strings above — the same readings held as
+  // numbers so they can be scaled and compared rather than only read. See
+  // contract.js: parsing a number back out of a formatted string would be the
+  // interface deriving a process value, which it may not do.
+  //
+  // This plant swings through six hundred degrees between its two ends, and
+  // that swing is the process: a converter bed near 450 °C, a separator at
+  // minus five to condense the ammonia out of the same loop, a urea reactor
+  // near 190 °C, a prilling tower at ambient. Units whose temperature the
+  // model does not establish report null and are left unshaded rather than
+  // given a plausible one.
+  const tempAt = {
+    [TAGS.converter]: x.converterTemp,
+    [TAGS.chiller]: x.separatorTemp,
+    [TAGS.separator]: x.separatorTemp,
+    [TAGS.ammoniaStorage]: x.separatorTemp,
+    [TAGS.ureaReactor]: x.ureaReactorTemp,
+    [TAGS.evaporator]: REF.meltTemp,
+    [TAGS.prillTower]: x.prillAirTemp
+  };
+  const only1 = v => (off || !Number.isFinite(v) ? null : v);
+  for (const [tag, e] of Object.entries(eq)) {
+    e.metrics = {
+      tempC: only1(tempAt[tag]),
+      load: only1(e.load ?? e.duty)
+    };
+  }
   return eq;
 }
 
@@ -1029,14 +1082,14 @@ function getInitialState(inputs = {}) {
   const s = assemble(blank, fx, { flow: 0, y: { H2: 0, N2: 0, NH3: 0, inert: 0 } });
   const built = buildResults(s, blank, fx);
   const nulls = obj => Object.fromEntries(Object.entries(obj).map(([k, v]) =>
-    [k, { ...v, value: v.kind === KIND.REF ? v.value : null }]));
+    [k, { ...v, value: v.kind === KIND.REF ? v.value : null, ...(v.share === undefined ? {} : { share: null }) }]));
   return {
     status: Status.READY, converged: false, iterations: null, residual: null,
     reason: 'Not calculated — set the operating conditions and run the simulation.',
     kpis: built.kpis.map(k => ({ ...k, value: null })),
     results: nulls(built.results), massBalance: nulls(built.massBalance),
     energyBalance: nulls(built.energyBalance), quality: nulls(built.quality),
-    charts: [], messages: [], diagnostics: [], streams: [], equipment: {}, steps: []
+    charts: [], messages: [], diagnostics: [], streams: [], equipment: {}, steps: [], convergence: []
   };
 }
 
@@ -1061,10 +1114,17 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
   const loop = { flow: solve.x.flow, y: { H2: solve.x.H2, N2: solve.x.N2, NH3: solve.x.NH3, inert: solve.x.inert } };
   const s = assemble(eff, fx, loop);
 
+  const convergence = [trace(
+    'loop',
+    'Ammonia synthesis loop recycle',
+    'Relative change in the recycle flow and its four mole fractions between one pass round the loop and the next. The loop is closed when a pass reproduces the recycle it was given. It is the slowest solve in the library: the inerts build up over many passes before the purge balances them.',
+    1e-9, solve
+  )].filter(Boolean);
+
   if (!solve.converged) {
     return {
       ...getInitialState(inputs), status: Status.ERROR, converged: false,
-      iterations: solve.iterations, residual: solve.residual,
+      iterations: solve.iterations, residual: solve.residual, convergence,
       reason: 'Synthesis loop recycle did not converge',
       messages: [],
       diagnostics: [...notes.map(text => ({ level: 'warning', text })), {
@@ -1084,7 +1144,7 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
   if (infeasible.length) {
     return {
       ...getInitialState(inputs), status: Status.ERROR,
-      converged: solve.converged, iterations: solve.iterations, residual: solve.residual,
+      converged: solve.converged, iterations: solve.iterations, residual: solve.residual, convergence,
       reason: 'No physically operable state at these conditions',
       messages: [],
       diagnostics: [...notes.map(text => ({ level: 'warning', text })),
@@ -1099,18 +1159,42 @@ function run(inputs, { scenario = 'base', faults = [] } = {}) {
   return {
     status: hasIssue ? Status.WARNING : Status.COMPLETE,
     converged: solve.converged, iterations: solve.iterations, residual: solve.residual,
-    reason: scenario, ...built,
+    convergence, reason: scenario, ...built,
     messages: [], diagnostics,
     streams: streamsFrom(s, eff), equipment: equipmentFrom(s, eff, fx),
     steps: buildSteps(s, eff, fx), state: s
   };
 }
 
+/**
+ * How this plant may be shaded. The domain is fixed to the validated range of
+ * the model rather than stretched to fit the run: a scale that rescales itself
+ * makes every case look the same and makes two runs impossible to compare by
+ * eye, which is the one thing a colour mode is for.
+ */
+const colourModes = [
+  {
+    id: 'state', label: 'Running state', kind: 'state',
+    what: 'Each unit in the colour of what it is doing — running, warning, tripped or stopped. This is what colour has meant here all along.'
+  },
+  {
+    id: 'thermal', label: 'Temperature', kind: 'scale',
+    metric: 'tempC', unit: U.tempC,
+    domain: [inputSpec.separatorTemp.min, inputSpec.converterTemp.max], scale: 'linear', digits: 0,
+    what: 'The temperature each unit runs at. The span is the process: the same loop that holds a catalyst bed near 450 °C has to be chilled below zero a few metres later, because that is the only way to take the ammonia out of a gas that is still mostly hydrogen and nitrogen.'
+  },
+  {
+    id: 'load', label: 'Duty and loading', kind: 'scale',
+    metric: 'load', unit: U.dimensionless, domain: [0, 1], scale: 'linear', digits: 2,
+    what: 'How hard each unit is working against the duty it was sized for. 1.00 is the design point rather than a limit, and units with no meaningful loading are left unshaded instead of shaded zero.'
+  }
+];
+
 export default {
   id: 'fertilizer',
   modelVersion: '1.0.0',
   inputSpec, assumptions, equations,
-  TAGS, STREAMS, FAULT_IDS, REF,
+  TAGS, STREAMS, FAULT_IDS, REF, colourModes,
   validate,
   getInitialState,
   run,
