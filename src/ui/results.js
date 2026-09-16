@@ -2,7 +2,7 @@ import { el, clear } from '../shared/dom.js';
 import { panel, kv, collapsible, message } from '../shared/components/panel.js';
 import { val, num, isEmpty } from '../shared/format.js';
 import { Status } from '../simulation/contract.js';
-import { lineChart, barChart, gauge } from '../shared/components/charts.js';
+import { lineChart, barChart, gauge, residualChart } from '../shared/components/charts.js';
 import { icon } from '../shared/icons.js';
 
 /**
@@ -132,20 +132,96 @@ function balanceSection(title, fields) {
   const entries = Object.entries(fields || {});
   if (!entries.length) return collapsible(title, [notCalculated()], true);
 
-  const closures = entries.filter(([k]) => /closure/i.test(k));
-  const rest = entries.filter(([k]) => !/closure/i.test(k));
-
-  const body = [
-    ...closures.map(([, f]) => closureBlock(f)),
-    ...rest.map(([k, f]) => row(k, f))
-  ];
-  if (closures.length) {
-    body.push(el('div', {
-      style: 'margin-top:6px;font-size:var(--t-fine);color:var(--ink-ghost);line-height:1.45',
-      text: `The bar is scaled to ${CLOSURE_SCALE_PCT} % of throughput — a scale for reading the number, not a tolerance. Convergence is decided by the solver.`
-    }));
+  // Engines that have not been told about families fall back to the flat list
+  // this section has always drawn. Nothing here invents a grouping.
+  const tagged = entries.filter(([, f]) => f.family && f.side);
+  if (!tagged.length) {
+    const closures = entries.filter(([k]) => /closure/i.test(k));
+    const rest = entries.filter(([k]) => !/closure/i.test(k));
+    const body = [...closures.map(([, f]) => closureBlock(f)), ...rest.map(([k, f]) => row(k, f))];
+    if (closures.length) body.push(closureNote());
+    return collapsible(title, body, true);
   }
+
+  // Several balances can live in one object — a solids balance and a water
+  // balance are two different questions asked of the same plant — and until the
+  // engines said so they were interleaved in one list with nothing to mark
+  // where one ended. Grouped, each is readable on its own; ungrouped, neither
+  // was.
+  const families = [];
+  for (const [k, f] of entries) {
+    const fam = f.family || '';
+    let g = families.find(x => x.id === fam);
+    if (!g) families.push(g = { id: fam, rows: [], closures: [] });
+    (f.side === 'closure' ? g.closures : g.rows).push([k, f]);
+  }
+
+  const multi = families.length > 1;
+  const body = [];
+  let anyClosure = false;
+  for (const g of families) {
+    if (multi) body.push(el('div', { class: 'bal-fam', text: famLabel(g.id) }));
+    for (const [, f] of g.closures) { body.push(closureBlock(f)); anyClosure = true; }
+
+    // Rows in the order the engine listed them, with a heading each time the
+    // direction changes. The engine already orders them in reading order — in,
+    // its total, out, its total — so following that beats re-sorting into an
+    // order nobody wrote.
+    //
+    // Headings only where there are two sides to tell apart. A group that is
+    // only a feed broken into its components has nothing to separate, and an
+    // "In" over it would be labelling a distinction that is not being made —
+    // worse than no label, because the next row down would look like it was
+    // being claimed as an inlet.
+    const sided = g.rows.some(([, f]) => f.side === 'in') && g.rows.some(([, f]) => f.side === 'out');
+    let side = null;
+    for (const [k, f] of g.rows) {
+      if (sided && (f.side === 'in' || f.side === 'out') && f.side !== side) {
+        side = f.side;
+        body.push(el('div', { class: 'bal-side', text: side === 'in' ? 'In' : 'Out' }));
+      }
+      body.push(balRow(k, f));
+    }
+  }
+  if (anyClosure) body.push(closureNote());
   return collapsible(title, body, true);
+}
+
+const famLabel = id => (id ? id.charAt(0).toUpperCase() + id.slice(1) : 'Balance');
+
+const closureNote = () => el('div', {
+  class: 'bal-note',
+  text: `The bar is scaled to ${CLOSURE_SCALE_PCT} % of throughput — a scale for reading the number, not a tolerance. Convergence is decided by the solver.`
+});
+
+/**
+ * One line of a balance: what it is, how much, and how much of the whole.
+ *
+ * The percentage is the column that makes a balance readable. "34.45 kg/h to
+ * clarifier sludge" means nothing on its own; "85 % of the solids charged"
+ * means the clarifier is doing its job, and the reader gets there without
+ * dividing two numbers four rows apart. The engine works the share out — a row
+ * as a fraction of the charge is a process quantity, and this file does not
+ * compute those.
+ *
+ * The chip carries the colour of the phase the quantity travels in, the same
+ * colours the flowsheet and the 3D streams use. It is the cheapest possible
+ * link between a number on the rail and a pipe on the drawing.
+ */
+function balRow(key, f) {
+  const empty = isEmpty(f.value);
+  return el('div', {
+    class: 'balrow', dataset: { side: f.side || '', ctx: String(f.side === 'context') },
+    title: f.label || key
+  }, [
+    el('i', { class: 'bal-chip', style: f.phase ? `background:var(--stream-${f.phase})` : '' }),
+    el('span', { class: 'bal-l', text: f.label || key }),
+    el('span', { class: 'bal-v', text: empty ? '—' : val(f.value, f.unit, f.digits ?? 2) }),
+    el('span', {
+      class: 'bal-p',
+      text: isEmpty(f.share) ? '' : `${num(f.share * 100, f.share < 0.001 && f.share > 0 ? 3 : 1)} %`
+    })
+  ]);
 }
 
 function closureBlock(f) {
@@ -186,6 +262,7 @@ function row(key, f) {
  */
 function solverSection(r) {
   const ok = r.converged === true;
+  const traces = r.convergence || [];
   return collapsible('Run state', [
     el('div', { class: 'msg', dataset: { lvl: ok ? 'ok' : 'warning' } }, [
       el('strong', { text: ok ? 'Converged. ' : 'Did not converge. ' }),
@@ -195,8 +272,40 @@ function solverSection(r) {
     ]),
     kv('Iterations', isEmpty(r.iterations) ? '—' : String(r.iterations)),
     kv('Residual', isEmpty(r.residual) ? '—' : r.residual.toExponential(2)),
-    kv('Solve time', isEmpty(r.solveMs) ? '—' : fmtMs(r.solveMs))
+    kv('Solve time', isEmpty(r.solveMs) ? '—' : fmtMs(r.solveMs)),
+    ...traces.map(traceBlock)
   ]);
+}
+
+/**
+ * One solve, drawn.
+ *
+ * A residual is a verdict; a residual per iteration is the working, and they
+ * answer different questions. Two runs can both report "converged" and have
+ * arrived there completely differently — one falling straight to tolerance in a
+ * dozen sweeps, the other crawling across six hundred while the inerts build up
+ * against the purge. Only the second tells you the loop is nearly unstable at
+ * these conditions, and only the chart tells you which one you have.
+ *
+ * Every trace carries its own verdict rather than borrowing the run's. A plant
+ * with two flashes can have one of them stall while the other is fine, and a
+ * single word at the top of the section cannot say which.
+ */
+function traceBlock(t) {
+  const n = t.history?.length || 0;
+  return el('figure', { class: 'chart trace', dataset: { ok: String(t.converged === true) } }, [
+    el('figcaption', {}, [
+      el('span', { text: t.label }),
+      el('span', {
+        class: 'trace-n',
+        text: t.converged
+          ? (n > 1 ? `met tolerance in ${n}` : 'no iteration needed')
+          : 'stalled'
+      })
+    ]),
+    residualChart({ history: t.history || [], tol: t.tol }),
+    t.what ? el('p', { class: 'chart-note', text: t.what }) : null
+  ].filter(Boolean));
 }
 
 /** Sub-millisecond solves are common here, and "0 ms" reads as "not measured". */
