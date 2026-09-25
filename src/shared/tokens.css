@@ -183,6 +183,12 @@
      the card is made of; much past a third it becomes a photograph with writing
      on it, which is a different and much worse card. */
   --photo:.2; --photo-hi:.34;
+  /* The live plant is allowed further forward than the still. The still is
+     atmosphere behind the words; the running plant is the thing the tile is
+     showing you, and it has to be legible as a plant or it is only a flicker.
+     The left-hand scrim still carries the text, so the gain is all on the
+     right, where the plant is framed. */
+  --live:.5; --live-hi:.72;
   --tile-scrim:rgba(9,13,21,.9);
   --tile-scrim-soft:rgba(9,13,21,.44);
   --tile-vignette:rgba(3,6,11,.42);
@@ -322,6 +328,7 @@
      would put a grey cloud on a white card. The vignette is cool grey and
      barely there: a black vignette on paper reads as a printing fault. */
   --photo:.26; --photo-hi:.4;
+  --live:.58; --live-hi:.8;
   --tile-scrim:rgba(248,251,254,.86);
   --tile-scrim-soft:rgba(248,251,254,.42);
   --tile-vignette:rgba(126,152,182,.26);

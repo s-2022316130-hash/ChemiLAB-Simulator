@@ -1426,6 +1426,29 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 }
 .simtile .tile-photo-img[data-ready="true"]{opacity:var(--photo)}
 .simtile:hover .tile-photo-img[data-ready="true"]{opacity:var(--photo-hi);transform:scale(1.035)}
+
+/* The plant, running. liveTiles.js puts a canvas in the photograph’s layer and
+   marks the tile live once it has drawn its first frame; until then, and on
+   any machine without WebGL, the tile is the still it always was. Same layer,
+   same scrims over it, so the text is protected exactly as before. The
+   photograph and the line-art sketch step aside once the real plant is on
+   screen — three pictures of one plant in one tile would be none of them. */
+.simtile .tile-live{
+  position:absolute;inset:0;z-index:0;width:100%;height:100%;display:block;opacity:0;
+  /* Set once, as the photograph’s is: a filter that changed per frame would
+     repaint the whole tile for nothing. */
+  filter:saturate(.92) contrast(1.03) brightness(1.16);
+  transition:opacity var(--dur-4) var(--ease-in-out);
+}
+.simtile[data-live="true"] .tile-live{opacity:var(--live)}
+.simtile[data-live="true"]:hover .tile-live,
+.simtile[data-live="true"]:focus-visible .tile-live{opacity:var(--live-hi)}
+.simtile[data-live="true"] .tile-photo .tile-photo-img[data-ready="true"]{opacity:0}
+.simtile[data-live="true"] .preview,
+.simtile[data-live="true"]:hover .preview{opacity:0}
+/* The light theme renders the plant in daylight, not as a night still, so it
+   needs none of the lift the photographs are given. */
+[data-theme="light"] .simtile .tile-live{filter:saturate(.95) contrast(1.02)}
 /* The text protection grows with the photograph.
    Hovering takes the image from a fifth of its strength to a third, and the
    scrim that was enough at a fifth is not enough at a third — the category line
@@ -1983,6 +2006,87 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   background:transparent;border-color:transparent;padding:2px 4px;opacity:.85;
 }
 .canvas-perf[data-tier="low"]{opacity:1}
+
+/* ===========================================================================
+   EXPORT
+   The plant-sheet dialog. A preview of the real sheet on the left, the choices
+   on the right, one primary action. It sits over the workspace rather than
+   replacing it, so closing it leaves everything exactly where it was.
+   =========================================================================== */
+.panel > header .xd-open{padding:3px 10px;font-size:var(--t-fine);gap:6px;text-transform:none;letter-spacing:.01em;font-family:var(--font)}
+.panel > header .xd-open svg{width:13px;height:13px}
+
+.xd-backdrop{
+  position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:24px;
+  background:var(--surface-veil);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  animation:fade-in var(--dur-2) var(--ease) backwards;
+}
+.xd-backdrop[data-closing="true"]{opacity:0;transition:opacity var(--dur-2) var(--ease-exit)}
+.xd{
+  width:min(1180px,100%);max-height:calc(100dvh - 48px);display:flex;flex-direction:column;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);
+  box-shadow:var(--sh-4), var(--edge);overflow:hidden;
+  animation:rise var(--dur-enter) var(--ease-enter) backwards;
+}
+.xd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:18px 20px 14px;border-bottom:1px solid var(--line-soft)}
+.xd-head h2{margin:0 0 4px;font-size:var(--t-h3);font-weight:650;color:var(--ink);letter-spacing:-.01em}
+.xd-head p{margin:0;font-size:var(--t-small);color:var(--ink-faint);line-height:1.45}
+.xd-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;padding:18px 20px;min-height:0;overflow:auto}
+
+/* The preview is the sheet itself at a third of its size, so it keeps the
+   sheet's own proportions and never stretches. */
+.xd-preview{
+  position:relative;align-self:start;border-radius:var(--r);overflow:hidden;
+  background:var(--bg-2);border:1px solid var(--line);aspect-ratio:4 / 3;
+}
+.xd-canvas{display:block;width:100%;height:auto;transition:opacity var(--dur-2) var(--ease)}
+.xd-preview[data-busy="true"] .xd-canvas{opacity:.45}
+.xd-busy{
+  position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;
+  font-family:var(--mono);font-size:var(--t-fine);letter-spacing:.08em;color:var(--ink-faint);
+  opacity:0;transition:opacity var(--dur-2) var(--ease);
+}
+.xd-preview[data-busy="true"] .xd-busy{opacity:1}
+
+.xd-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.xd-set{margin:0;padding:0;border:0;min-width:0}
+.xd-set legend{
+  padding:0 0 7px;font-family:var(--mono);font-size:var(--t-micro);letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-ghost);font-weight:600;
+}
+.xd-parts{display:flex;flex-direction:column;gap:3px;max-height:260px;overflow:auto;padding-right:2px}
+.xd-sizes{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.xd-opt{
+  display:flex;align-items:flex-start;gap:9px;padding:7px 9px;border-radius:var(--r-sm);cursor:pointer;
+  border:1px solid transparent;
+  transition:background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
+}
+.xd-opt:hover{background:var(--bg-2)}
+.xd-opt:has(input:checked){background:var(--hue-wash);border-color:color-mix(in srgb,var(--hue) 34%,transparent)}
+.xd-opt:has(input[type=checkbox]:checked){background:transparent;border-color:transparent}
+.xd-opt:has(input[type=checkbox]:checked):hover{background:var(--bg-2)}
+.xd-opt[data-disabled="true"]{opacity:.5;cursor:not-allowed}
+.xd-opt input{margin:2px 0 0;accent-color:var(--hue);flex:0 0 auto}
+.xd-opt span{display:flex;flex-direction:column;gap:1px;min-width:0}
+.xd-opt b{font-size:var(--t-small);font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xd-opt small{font-size:var(--t-fine);color:var(--ink-faint)}
+.xd-opt:focus-within{outline:2px solid var(--accent);outline-offset:1px}
+
+.xd-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 20px;border-top:1px solid var(--line-soft);background:var(--bg-1)}
+.xd-note{font-size:var(--t-fine);color:var(--ink-faint);line-height:1.4}
+
+/* On a phone the dialog is the screen: preview on top, choices under it, the
+   actions pinned to the foot where a thumb is. */
+@media (max-width:760px){
+  .xd-backdrop{padding:0;place-items:end stretch}
+  .xd{width:100%;max-height:92dvh;border-radius:var(--r-xl) var(--r-xl) 0 0}
+  .xd-body{grid-template-columns:1fr;padding:14px}
+  .xd-parts{max-height:none}
+  .xd-foot{flex-direction:column;align-items:stretch}
+  .xd-foot .btnrow{justify-content:flex-end}
+  .panel > header .xd-open span{display:none}
+}
 
 /* ===========================================================================
    REDUCED MOTION

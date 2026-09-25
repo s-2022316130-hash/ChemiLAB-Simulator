@@ -329,6 +329,8 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
     /** Which captions the diagram shows. Independent of what has been solved. */
     setCaptions(next) { captions = { ...captions, ...next }; applyCaptions(); return { ...captions }; },
     get captions() { return { ...captions }; },
+    /** The live drawing, for the export sheet to copy. Read-only by convention. */
+    get svg() { return root; },
     /** Reset the view to the whole diagram. */
     fit,
     /** Zoom about the middle of the panel, for the on-screen controls. */
