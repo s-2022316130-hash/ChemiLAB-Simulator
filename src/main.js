@@ -13,5 +13,5 @@ const router = createRouter({
   home: () => homePage(shell.view),
   simulators: () => simulatorsPage(shell.view),
   simulator: ({ id }) => simulatorPage(shell.view, id)
-}, route => shell.setRoute(route, route.params.id ? getSimulator(route.params.id)?.name : null));
+}, route => shell.setRoute(route, route.params.id ? getSimulator(route.params.id)?.name : null), { view: shell.view });
 router.start();

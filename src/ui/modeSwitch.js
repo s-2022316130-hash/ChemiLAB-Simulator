@@ -27,9 +27,18 @@ export function createModeSwitch(store) {
     onClick: () => store.set({ level: lv })
   }));
   seg.append(...buttons);
+  // The selection is one thumb that slides between positions, drawn by the
+  // stylesheet from these two numbers. A highlight that jumps from one button to
+  // another reads as three buttons; one that travels reads as a dial being
+  // turned, which is what changing the detail level is.
+  seg.style.setProperty('--seg-n', String(LEVEL_ORDER.length));
 
   store.subKeys(['level'], s => {
     LEVEL_ORDER.forEach((lv, i) => buttons[i].setAttribute('aria-pressed', String(lv === s.level)));
+    seg.style.setProperty('--seg-i', String(Math.max(0, LEVEL_ORDER.indexOf(s.level))));
+    // Not before the first position is set, or the thumb would slide into place
+    // from the left on every page load.
+    if (!seg.dataset.ready) requestAnimationFrame(() => { seg.dataset.ready = 'true'; });
     note.textContent = HINT[s.level] || '';
   });
 

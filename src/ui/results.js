@@ -33,7 +33,26 @@ import { icon } from '../shared/icons.js';
 const CLOSURE_SCALE_PCT = 0.1;
 
 export function createResults(engine, store) {
-  const host = el('div');
+  const host = el('div', { class: 'rail-body' });
+  // Movement on this rail means one thing: a new answer arrived. The rail is
+  // redrawn for other reasons too — the detail level changes, the inputs go
+  // stale — and replaying the arrival every time would teach the reader that
+  // motion here means nothing. So the last result drawn is remembered, and
+  // only a different one animates.
+  let lastDrawn = null;
+  // What each headline reading showed last time, as it was displayed. Compared
+  // as the formatted string rather than the raw number: a reading that moved
+  // in the ninth decimal place and still shows the same digits has not changed
+  // for anyone looking at it, and pulsing it would say otherwise.
+  let lastShown = new Map();
+  // "Fresh" means not yet painted, not "first time drawn". A result arriving
+  // sets `dirty` back to false straight afterwards, which redraws this rail a
+  // second time in the same task, before anything reaches the screen — and a
+  // test of "have I drawn this before" would call that second draw stale and
+  // throw the arrival away unseen. So the arrival holds until a frame has
+  // actually been painted with it.
+  let arrivalChanged = new Set();
+  let painted = true;
   const statusEl = el('span', { class: 'status', dataset: { s: 'READY' }, text: 'READY' });
   const p = panel({ title: 'Results', right: statusEl, body: [host] });
 
@@ -73,8 +92,22 @@ export function createResults(engine, store) {
     }
 
     const r = result;
+    if (r !== lastDrawn) {
+      const shown = new Map((r.kpis || []).map(k => [k.label, shownValue(k)]));
+      arrivalChanged = new Set();
+      // Nothing is "changed" on the first result there is: there is nothing it
+      // changed from.
+      if (lastDrawn) for (const [label, s] of shown) if (lastShown.has(label) && lastShown.get(label) !== s) arrivalChanged.add(label);
+      lastShown = shown;
+      lastDrawn = r;
+      painted = false;
+      requestAnimationFrame(() => { painted = true; });
+    }
+    const fresh = !painted;
+    const changed = fresh ? arrivalChanged : new Set();
+    host.dataset.fresh = String(fresh);
     host.append(
-      kpiBlock(r.kpis || []),
+      kpiBlock(r.kpis || [], changed),
       section('Process results', r.results),
       balanceSection('Mass balance', r.massBalance),
       balanceSection('Energy balance', r.energyBalance),
@@ -91,18 +124,25 @@ export function createResults(engine, store) {
 
 /* --- blocks ---------------------------------------------------------------- */
 
-function kpiBlock(kpis) {
+function kpiBlock(kpis, changed = new Set()) {
   if (!kpis.length) return null;
-  return el('div', { class: 'kpis' }, kpis.map((k, i) => kpiCard(k, i === 0)));
+  return el('div', { class: 'kpis' }, kpis.map((k, i) => kpiCard(k, i === 0, i, changed.has(k.label))));
 }
 
+/** A reading as it appears on the card, for telling whether it changed. */
+const shownValue = k => (isEmpty(k.value) ? '—' : num(k.value, k.digits ?? 2));
+
 /** A headline number reads as a card; the lead one reads as the answer. */
-function kpiCard(k, lead) {
+function kpiCard(k, lead, index = 0, changed = false) {
   const empty = isEmpty(k.value);
   const node = el('div', {
     class: 'kpi',
-    dataset: { empty: String(empty), lead: String(!!lead) },
-    style: `animation-delay:${lead ? 0 : 30}ms`,
+    // `changed` marks a reading whose displayed value is different from the
+    // previous run. It is a pulse, not a count-up: animating the number from the
+    // old value to the new one would put on screen, for half a second, a series
+    // of values no engine ever calculated.
+    dataset: { empty: String(empty), lead: String(!!lead), changed: String(!!changed) },
+    style: `--i:${index}`,
     title: k.label
   }, [
     el('span', { class: 'kpi-l', text: k.label }),

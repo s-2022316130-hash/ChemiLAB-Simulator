@@ -83,8 +83,18 @@ export function mountWorkspace(root, sim) {
   const tabbar = el('div', { class: 'tabbar', role: 'tablist' });
   const tabButtons = new Map();
 
+  let tabIndex = 0;
   function showTab(id) {
     for (const t of TABS) tabButtons.get(t.id)?.setAttribute('aria-selected', String(t.id === id));
+    // The screen that comes in slides from the side its tab is on, so moving
+    // right along the bar brings the next screen in from the right. The bar and
+    // the screens then describe the same order, and the thumb and the content
+    // move together instead of one moving and the other just appearing.
+    const next = Math.max(0, TABS.findIndex(t => t.id === id));
+    workspace.dataset.dir = next >= tabIndex ? 'fwd' : 'back';
+    tabIndex = next;
+    tabbar.style.setProperty('--tab-i', String(next));
+    if (!tabbar.dataset.ready) requestAnimationFrame(() => { tabbar.dataset.ready = 'true'; });
     // A pane is active if the showing tab wants it, so the stage stays mounted
     // while its two panels take turns inside it.
     const wanted = new Set(TABS.find(t => t.id === id)?.panes || []);
@@ -98,7 +108,7 @@ export function mountWorkspace(root, sim) {
     tabButtons.set(t.id, b);
     tabbar.appendChild(b);
   }
-  showTab('plant');
+  tabbar.style.setProperty('--tab-n', String(TABS.length));
 
   // Run is a floating action rather than a fifth tab: it is the one thing you
   // do here, and it has to be reachable from every screen without becoming a
@@ -109,6 +119,7 @@ export function mountWorkspace(root, sim) {
   });
 
   const workspace = el('div', { class: 'workspace' }, [left, stage, rail, fab, tabbar]);
+  showTab('plant');
   clear(root).appendChild(workspace);
 
   /** A button that shows whether it is on rather than needing a click to find out. */
@@ -196,9 +207,12 @@ export function mountWorkspace(root, sim) {
     }
     capBar.append(capBtn, el('span', { class: 'sep' }), detail);
 
-    // Measured frame rate, so "smooth" is a number rather than a claim.
-    const perf = el('span', { class: 'perf', title: 'Measured frame rate and the render quality it is being held at' });
-    capBar.append(el('span', { class: 'sep' }), perf);
+    // Measured frame rate, so "smooth" is a number rather than a claim. It is a
+    // readout rather than a control, so it sits on its own in the empty corner
+    // instead of at the end of the toolbar — where it was the one item that
+    // pushed seven controls onto a second row.
+    const perf = el('span', { class: 'perf canvas-perf', title: 'Measured frame rate and the render quality it is being held at' });
+    host3d.appendChild(perf);
     const tick = setInterval(() => {
       const fps = view.fps;
       perf.textContent = fps === null

@@ -160,9 +160,14 @@ const TINT_MIX = 0.66;        // how far toward the ramp colour the base moves
 const TINT_METALNESS = 0.3;   // a mirror takes no colour: polished steel has to
 const TINT_ROUGHNESS = 0.46;  // dull slightly, or the tint is invisible on it
 
-export function tint(group, colour) {
+export function tint(group, colour, strength = 1) {
   if (!group?.isObject3D) return;
-  const c = colour ? new THREE.Color(colour) : null;
+  // `strength` runs 0 to 1 between the unit's own paint and the full tint, so
+  // the renderer can move a plant between colour modes over a few hundred
+  // milliseconds rather than snapping. At 0 it is the untinted material
+  // exactly, which is also what a null colour means.
+  const k = Math.max(0, Math.min(1, Number.isFinite(strength) ? strength : 1));
+  const c = colour && k > 0 ? new THREE.Color(colour) : null;
   group.traverse(o => {
     if (!o.isMesh || !o.material || o.name || Array.isArray(o.material)) return;
 
@@ -186,9 +191,10 @@ export function tint(group, colour) {
     const base = o.userData._tintOrig, m = o.userData._tintMat;
     if (!base || !m) return;
     if (c) {
-      m.color.copy(base.color).lerp(c, TINT_MIX);
-      m.metalness = Math.min(base.metalness ?? 0, TINT_METALNESS);
-      m.roughness = Math.max(base.roughness ?? 0.5, TINT_ROUGHNESS);
+      const bm = base.metalness ?? 0, br = base.roughness ?? 0.5;
+      m.color.copy(base.color).lerp(c, TINT_MIX * k);
+      m.metalness = bm + (Math.min(bm, TINT_METALNESS) - bm) * k;
+      m.roughness = br + (Math.max(br, TINT_ROUGHNESS) - br) * k;
     } else {
       m.color.copy(base.color);
       m.metalness = base.metalness ?? 0;

@@ -70,9 +70,8 @@ hr{border:0;border-top:1px solid var(--line-soft);margin:14px 0}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes breathe{0%,100%{opacity:.45}50%{opacity:1}}
 @keyframes tick-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){
-  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
-}
+/* Reduced motion is handled at the end of this file, where it can replace the
+   keyframes above rather than zeroing every duration — see REDUCED MOTION. */
 
 /* ===========================================================================
    SHELL
@@ -1011,7 +1010,9 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 
 /* A tinted symbol carries its reading as the fill, leaving the outline free to
    go on carrying the running state. */
-.fs-node[data-tinted="true"] .fs-body{transition:fill var(--dur-3) var(--ease)}
+/* (The fill glide lives on the base .fs-body rule, so clearing a mode glides
+   back as smoothly as setting one — a rule that only applied while tinted
+   snapped on the way out, and replaced the hover transitions on the way in.) */
 
 /* Live frame-rate and quality readout. */
 .perf{
@@ -1096,7 +1097,7 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 .fs-node{cursor:pointer;transition:opacity var(--dur-2) var(--ease)}
 .fs-scroll{touch-action:none;cursor:grab}
 .fs-scroll:active{cursor:grabbing}
-.fs-node .fs-body{transition:stroke var(--dur-2) var(--ease), filter var(--dur-2) var(--ease)}
+.fs-node .fs-body{transition:stroke var(--dur-2) var(--ease), filter var(--dur-2) var(--ease), fill var(--dur-4) var(--ease-in-out)}
 .fs-node:hover .fs-body{filter:drop-shadow(0 0 5px currentColor)}
 .fs-node.sel .fs-body{stroke:var(--accent);stroke-width:2.8;filter:drop-shadow(0 0 9px var(--accent))}
 .fs-node.hov .fs-body{stroke:var(--hue-soft)}
@@ -1791,3 +1792,262 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 }
 
 .level-hide{display:none!important}
+
+/* ===========================================================================
+   MOTION
+   One rule for all of it: movement says that something changed, where it came
+   from, or where it went. Nothing here loops for decoration, and nothing moves
+   that the reader did not cause. The global prefers-reduced-motion rule at the
+   top of this file reaches every animation and transition below; the few
+   movements JavaScript waits on ask shared/motion.js first.
+   =========================================================================== */
+
+/* --- navigation -----------------------------------------------------------
+   The page you are leaving fades and lifts, briefly, before the next one is
+   built. Shorter than an arrival on purpose: nobody is looking at the page
+   they just asked to leave. The transition is declared on the leaving state
+   only, so the new page appears at full opacity rather than fading up from
+   where the old one stopped. */
+.view[data-phase="leave"]{
+  opacity:0;transform:translateY(-6px);pointer-events:none;
+  transition:opacity var(--dur-exit) var(--ease-exit), transform var(--dur-exit) var(--ease-exit);
+}
+
+/* The indicator under the masthead nav slides between pages. One mark that
+   moves says "you went from there to here"; two underlines that swap only say
+   "this one now". Its position comes from shell.js. */
+.topbar nav{position:relative;isolation:isolate}
+.topbar nav a[aria-current="page"]{background:transparent}
+.topbar nav a[aria-current="page"]::after{content:none}
+.topbar nav::before,.topbar nav::after{
+  content:"";position:absolute;left:0;pointer-events:none;opacity:var(--nav-on,0);
+}
+.topbar nav::before{
+  z-index:-1;top:0;bottom:0;width:var(--nav-w,0px);
+  transform:translateX(var(--nav-x,0px));
+  border-radius:var(--r-sm);background:var(--bg-2);
+}
+.topbar nav::after{
+  bottom:2px;height:1.5px;border-radius:2px;
+  width:max(0px, calc(var(--nav-w,0px) - 24px));
+  transform:translateX(calc(var(--nav-x,0px) + 12px));
+  background:var(--hue);box-shadow:0 0 8px var(--hue-glow);
+}
+.topbar nav[data-ready]::before,.topbar nav[data-ready]::after{
+  transition:transform var(--dur-slide) var(--ease-slide), width var(--dur-slide) var(--ease-slide),
+             opacity var(--dur-2) var(--ease);
+}
+
+/* --- theme -----------------------------------------------------------------
+   The new theme spreads out from the button that asked for it, as a circle
+   whose centre and reach shell.js measures. The whole page is one snapshot, so
+   the 3D plant and the interface change in the same stroke rather than the
+   interface flipping while the scene catches up a frame later. */
+:root[data-vt="theme"]::view-transition-old(root),
+:root[data-vt="theme"]::view-transition-new(root){animation:none;mix-blend-mode:normal}
+:root[data-vt="theme"]::view-transition-new(root){
+  animation:theme-reveal 640ms var(--ease-enter);
+}
+@keyframes theme-reveal{
+  from{clip-path:circle(0px at var(--vt-x,100%) var(--vt-y,0px))}
+  to{clip-path:circle(var(--vt-r,150vmax) at var(--vt-x,100%) var(--vt-y,0px))}
+}
+
+/* --- the workspace arrives -------------------------------------------------
+   In reading order: the controls you start from, then the plant they drive,
+   then the results they produce. Each panel lands a beat after the one before,
+   which is the input, model, output relationship the whole layout exists to
+   show, played once as it assembles. Translation and opacity only, so it runs
+   on the compositor while the 3D scene is still compiling its first frames. */
+@keyframes ws-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media (min-width:901px){
+  .workspace > .col-left > *,
+  .workspace > .stage > *,
+  .workspace > .col-rail > *{animation:ws-in var(--dur-enter) var(--ease-enter) backwards}
+  .workspace > .col-left > :nth-child(2){animation-delay:calc(var(--stagger) * 1)}
+  .workspace > .col-left > :nth-child(n+3){animation-delay:calc(var(--stagger) * 2)}
+  .workspace > .stage > :nth-child(1){animation-delay:calc(var(--stagger) * 1)}
+  .workspace > .stage > :nth-child(2){animation-delay:calc(var(--stagger) * 2)}
+  .workspace > .col-rail > :nth-child(1){animation-delay:calc(var(--stagger) * 2)}
+  .workspace > .col-rail > :nth-child(2){animation-delay:calc(var(--stagger) * 3)}
+  .workspace > .col-rail > :nth-child(n+3){animation-delay:calc(var(--stagger) * 4)}
+}
+
+/* On a phone, one screen at a time: the one arriving comes in from the side
+   its tab is on, so the bar and the screens describe the same order. */
+@keyframes pane-fwd{from{opacity:0;transform:translateX(22px)}to{opacity:1;transform:none}}
+@keyframes pane-back{from{opacity:0;transform:translateX(-22px)}to{opacity:1;transform:none}}
+@media (max-width:900px){
+  .workspace > .pane[data-active="true"],
+  .workspace .stage > .panel[data-active="true"]{animation:pane-fwd var(--dur-3) var(--ease-enter) backwards}
+  .workspace[data-dir="back"] > .pane[data-active="true"],
+  .workspace[data-dir="back"] .stage > .panel[data-active="true"]{animation-name:pane-back}
+
+  /* The selected tab is a thumb that slides along the bar, not a highlight
+     that jumps from button to button. */
+  .tabbar::before{
+    content:"";position:absolute;z-index:0;pointer-events:none;
+    top:6px;bottom:calc(6px + env(safe-area-inset-bottom,0px));left:8px;
+    width:calc((100% - 16px - (var(--tab-n,4) - 1) * 2px) / var(--tab-n,4));
+    transform:translateX(calc(var(--tab-i,0) * (100% + 2px)));
+    border-radius:var(--r-sm);background:var(--hue-wash);
+    box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--hue) 22%,transparent);
+  }
+  .tabbar[data-ready]::before{transition:transform var(--dur-slide) var(--ease-slide)}
+  .tabbar button{position:relative;z-index:1}
+  .tabbar button[aria-selected="true"]{background:transparent}
+  .tabbar button svg{transition:transform var(--dur-2) var(--ease-slide)}
+  .tabbar button[aria-selected="true"] svg{transform:translateY(-1px)}
+  .canvas-perf{display:none}
+}
+
+/* --- segmented control -----------------------------------------------------
+   Student / Engineer / Expert is one dial with three positions, so the
+   selection is one thumb that travels between them. modeSwitch.js supplies the
+   position; the geometry is here. */
+.seg{position:relative;isolation:isolate}
+.seg::before{
+  content:"";position:absolute;z-index:0;pointer-events:none;
+  top:2px;bottom:2px;left:2px;
+  width:calc((100% - 4px - (var(--seg-n,3) - 1) * 2px) / var(--seg-n,3));
+  transform:translateX(calc(var(--seg-i,0) * (100% + 2px)));
+  border-radius:var(--r-xs);background:var(--bg-1);
+  box-shadow:var(--sh-1), inset 0 0 0 1px var(--line);
+}
+.seg[data-ready]::before{transition:transform var(--dur-slide) var(--ease-slide)}
+.seg button{position:relative;z-index:1}
+.seg button[aria-pressed="true"]{background:transparent;box-shadow:none}
+.seg button[aria-pressed="true"]::before{animation:dot-in var(--dur-3) var(--ease-slide) backwards;animation-delay:80ms}
+@keyframes dot-in{from{transform:scale(0);opacity:0}to{transform:none;opacity:1}}
+
+/* --- sections that fold ----------------------------------------------------
+   They open to their height rather than jumping to it, so the content below
+   is seen moving out of the way instead of being somewhere else next frame.
+   Browsers without ::details-content keep the instant open they always had. */
+.collapsible,.ctrl-group,.ch-hint{interpolate-size:allow-keywords}
+.collapsible::details-content,.ctrl-group::details-content,.ch-hint::details-content{
+  block-size:0;overflow-y:clip;
+  transition:block-size var(--dur-3) var(--ease-enter), content-visibility var(--dur-3) allow-discrete;
+}
+.collapsible[open]::details-content,.ctrl-group[open]::details-content,.ch-hint[open]::details-content{block-size:auto}
+
+/* --- results ---------------------------------------------------------------
+   Movement on the rail means one thing: a new answer arrived. Redraws for any
+   other reason — a detail-level change, inputs going stale — hold still, or
+   the reader learns that motion here means nothing. */
+.rail-body[data-fresh="false"] .kpi{animation:none}
+.kpi{animation-delay:calc(var(--i,0) * 38ms)}
+.rail-body[data-fresh="true"] > .collapsible,
+.rail-body[data-fresh="true"] > .msg{animation:rise var(--dur-3) var(--ease-enter) backwards}
+.rail-body[data-fresh="true"] > :nth-child(3){animation-delay:90ms}
+.rail-body[data-fresh="true"] > :nth-child(4){animation-delay:130ms}
+.rail-body[data-fresh="true"] > :nth-child(5){animation-delay:170ms}
+.rail-body[data-fresh="true"] > :nth-child(n+6){animation-delay:210ms}
+
+/* A headline reading whose displayed value differs from the run before pulses
+   once, after it has landed. Not a count-up: sweeping the digits from the old
+   value to the new one would show, for half a second, numbers no engine ever
+   calculated. */
+.kpi[data-changed="true"]{
+  animation:rise var(--dur-3) var(--ease-out) backwards, kpi-changed 1300ms var(--ease-out) 1;
+  animation-delay:calc(var(--i,0) * 38ms), calc(var(--i,0) * 38ms + 220ms);
+}
+@keyframes kpi-changed{
+  0%{box-shadow:0 0 0 1px color-mix(in srgb,var(--hue) 70%,transparent), 0 0 22px -4px var(--hue-glow), var(--edge);
+     background:color-mix(in srgb,var(--hue-wash) 80%, var(--bg-2))}
+  100%{box-shadow:0 0 0 1px transparent, 0 0 0 0 transparent, var(--edge);background:var(--bg-2)}
+}
+
+/* The run's verdict lands with a little weight when it arrives, so the eye goes
+   to it; while solving it is a pulse, as it always was. */
+.status[data-s="COMPLETE"],.status[data-s="WARNING"],.status[data-s="ERROR"]{
+  animation:status-land var(--dur-3) var(--ease-slide)
+}
+@keyframes status-land{0%{transform:scale(.9);opacity:.4}60%{transform:scale(1.04)}100%{transform:none;opacity:1}}
+
+/* --- colour-mode legend ----------------------------------------------------
+   It rises into its corner when a scale is chosen and sinks away when the
+   plant goes back to showing state, rather than blinking in and out. */
+.cmode-legend{
+  transition:opacity var(--dur-2) var(--ease), transform var(--dur-3) var(--ease-enter),
+             display var(--dur-3) allow-discrete;
+}
+.cmode-legend[hidden]{opacity:0;transform:translateY(8px)}
+@starting-style{.cmode-legend:not([hidden]){opacity:0;transform:translateY(8px)}}
+
+/* --- canvas readout --------------------------------------------------------
+   The frame-rate readout, on its own in the corner the colour-mode legend no
+   longer uses. A readout, not a control, so it carries no chrome. */
+.canvas-perf{
+  position:absolute;top:13px;left:12px;z-index:3;pointer-events:auto;
+  background:transparent;border-color:transparent;padding:2px 4px;opacity:.85;
+}
+.canvas-perf[data-tier="low"]{opacity:1}
+
+/* ===========================================================================
+   REDUCED MOTION
+   Asking for less motion is asking for less *movement* — not for an interface
+   that cuts between states with nothing in between. So under the preference
+   things stop travelling, lifting, zooming and looping, and they go on fading
+   and changing colour, because neither of those is movement and both are how
+   a change stays visible instead of just having happened.
+
+   This replaces a rule that set every duration in the file to zero. That rule
+   was safe, and it also meant anyone with "Show animations in Windows" turned
+   off — a common default on low-power and virtual machines — saw an interface
+   with no transitions at all and no way to know one was intended.
+
+   It is last in the file on purpose: a @keyframes of the same name declared
+   later wins, so the fades below replace the travelling versions above only
+   while the preference is set.
+   =========================================================================== */
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto!important}
+
+  /* Loops hold still. Each one — the flowing-stream dashes, the spinner, the
+     sheen — has a word or a colour beside it saying the same thing. */
+  @keyframes spin{from{transform:none}to{transform:none}}
+  @keyframes dash{from{stroke-dashoffset:0}to{stroke-dashoffset:0}}
+  @keyframes sweep{from{transform:translateX(-100%)}to{transform:translateX(-100%)}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+  /* Arrivals fade in where they will sit, instead of travelling there. */
+  @keyframes fade-up{from{opacity:0}to{opacity:1}}
+  @keyframes rise{from{opacity:0}to{opacity:1}}
+  @keyframes tick-in{from{opacity:0}to{opacity:1}}
+  @keyframes ws-in{from{opacity:0}to{opacity:1}}
+  @keyframes pane-fwd{from{opacity:0}to{opacity:1}}
+  @keyframes pane-back{from{opacity:0}to{opacity:1}}
+  @keyframes dot-in{from{opacity:0}to{opacity:1}}
+  @keyframes status-land{from{opacity:.4}to{opacity:1}}
+
+  /* Indicators arrive at their new place without sliding there. */
+  .seg::before,.tabbar::before,.topbar nav::before,.topbar nav::after{
+    transition-property:opacity,background-color!important
+  }
+  .tabbar button svg{transition:none}
+  .tabbar button[aria-selected="true"] svg{transform:none}
+
+  /* Hover lifts and zooms go; the colour and border change still say it. */
+  .iconbtn:hover,.iconbtn:active,.btn:hover,.btn:active,.kpi:hover,
+  .canvas-presets .cam:hover,.canvas-presets .cam:active,
+  .simtile:hover,.simtile:hover .launch svg,
+  .simtile:hover .tile-photo-img[data-ready="true"]{transform:none}
+  .field input[type=range]:hover::-webkit-slider-thumb{transform:none}
+
+  /* Sections open at once; their contents still fade up. */
+  .collapsible::details-content,.ctrl-group::details-content,.ch-hint::details-content{transition:none}
+
+  /* A page leaves by fading, without lifting; the legend fades in place; the
+     sheet is simply there. */
+  .view[data-phase="leave"]{transform:none}
+  .cmode-legend[hidden]{transform:none}
+  @starting-style{.cmode-legend:not([hidden]){transform:none}}
+  .sheet{transition:none}
+
+  /* The theme cross-fades rather than spreading out from the button. The old
+     page holds while the new one fades up over it, which reads as a clean
+     cross-fade rather than dipping through the background halfway. */
+  :root[data-vt="theme"]::view-transition-new(root){animation:vt-fade-in 280ms var(--ease) both}
+}
+@keyframes vt-fade-in{from{opacity:0}to{opacity:1}}
