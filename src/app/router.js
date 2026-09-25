@@ -31,6 +31,15 @@ export function createRouter(routes, render, { view } = {}) {
   async function handle() {
     const my = ++nav;
     const route = parse();
+    // Some routes are places on the page already open rather than pages of
+    // their own — the overview and the simulator library are one page, the
+    // library is simply further down it. The page is asked first; if it can
+    // go there in place, nothing is torn down and rebuilt, and moving between
+    // the two is a scroll rather than a reload.
+    if (current?.navigate?.(route)) {
+      render(route, current);
+      return;
+    }
     // Reduced motion still gets the exit: the stylesheet takes the lift out of
     // it and leaves the fade, and a fade is not movement.
     if (current && view) {

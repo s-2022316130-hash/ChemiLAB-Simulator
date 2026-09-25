@@ -249,6 +249,61 @@ meant anyone with Windows' "Show animations" turned off — common on low-power 
 virtual machines — saw no transitions anywhere, with nothing to say one was intended.
 Do not put it back.
 
+## Live library tiles
+
+Each tile on the overview shows its plant actually running — built by the same plant
+module the workspace uses, run by the same engine at its base case, so a stream that
+flows on a tile is one the model reports flow in. `app/liveTiles.js` owns the tiles and
+never imports three.js; `scene/previewStage.js` is loaded only when the library nears
+the viewport.
+
+- **One renderer for all five.** Five would compile every shader and upload every
+  material five times and hold five GPU contexts. Each plant has its own scene and
+  camera; the shared renderer draws it into a corner of one drawing buffer and the frame
+  is copied into the tile's own 2D canvas, so each tile keeps its place in its layer
+  stack, under the scrims that protect its text.
+- **A small view shim, not the workspace renderer.** Plant modules only ever call
+  `view.add`, `view.addEquipment` and `view.onTick`; framing uses `getEquipment` and
+  `listEquipment`. The shim implements exactly that.
+- **One view per plant module at a time.** Each plant module keeps a single
+  module-level `live` reference for `applyState`. The overview and a workspace are never
+  mounted together, and leaving the overview disposes every preview and hands the GPU
+  context back before the workspace asks for its own.
+- **Scheduled, not drawn every frame.** Measured on a slow machine, one plant costs 4–12
+  ms to draw and all five about 35 ms — more than a whole 30 fps frame. The stage caps
+  tile work at 7 ms in any frame and about 30 % of the main thread overall, sets each
+  tile's rate from what drawing it actually costs, and gives the hovered tile the full
+  30 fps. A fast machine sees no difference; a slow one gets a lower tile rate and a page
+  that still scrolls.
+- Framing matches the stills behind the tiles (`tools/backdrops.js`), so a tile going
+  live reads as the photograph starting to move. Under reduced motion the tiles stay
+  still and a plant runs only while its tile is hovered or focused.
+
+## Plant sheet export
+
+The **Export** button in the 3D panel header composes one image of one part of the
+plant: a title block, the 3D picture with callouts in the margins and leader lines to
+each unit, the live flowsheet with the same part ringed on it, the run's headline
+figures, a legend, and a line at the foot saying where the numbers came from.
+`ui/exportDialog.js` is the dialog; `ui/exportSheet.js` draws the sheet; the preview is
+the same drawing at a third of the size.
+
+- **Parts** are the plant's own camera presets, reframed for the sheet's 1.9 : 1 picture
+  — at or above the renderer's reference aspect, so its field-of-view widening never
+  kicks in and the framing lands exactly — plus the current view and the selected unit.
+- `renderer.snapshot({width, height, pose})` renders from any pose, copies the frame out
+  before the drawing buffer is overwritten, projects a point on each unit's body to
+  image pixels, and restores everything in the same task.
+- **A part calls out only its own units.** Labelling everything in the picture put a
+  dozen leaders across the plant and buried the ones that mattered. A sheet of the whole
+  view has no subject and names every unit, split between the margins at the median unit
+  rather than the picture's centre so neither margin is crushed.
+- **Readings are the engine's formatted `values`**, as the HUD shows them. With no run,
+  units are named and not measured, and the sheet says so.
+- The flowsheet SVG is cloned and every `var(--token)` in it replaced with the value in
+  use, because an SVG drawn as an image sees none of the page's stylesheet. The dash on a
+  flowing line is the one CSS-only style that matters, and it is written onto the clone.
+
 ## Gallery photography
 
 Library tiles are backed by a still of the plant they open — a render of the actual

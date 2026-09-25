@@ -666,6 +666,79 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
       return url;
     },
 
+    /**
+     * A still of the plant for the export sheet, from any camera position, with
+     * where every unit landed in the picture.
+     *
+     * `pose` is used exactly as given — it has already been framed for the
+     * export's own shape, which is not this panel's, so it is not passed through
+     * the panel framing that jumpTo applies. With no pose, the camera the reader
+     * is looking through is used.
+     *
+     * Everything is put back before this returns, in the same task, so the
+     * panel on screen never shows the export's camera even for a frame.
+     *
+     * `anchors` gives, for each tag, a point on the unit's body in image
+     * pixels and whether it is actually in the picture. A point on the body
+     * rather than above it, because a callout on a drawing points at the thing,
+     * not at the air over it.
+     */
+    snapshot({ width = 1600, height = 900, pose = null } = {}) {
+      const saved = {
+        pos: camera.position.clone(), target: controls.target.clone(),
+        aspect: camera.aspect, marker: marker.visible, outline: outlinePass.enabled,
+        bloom: bloomPass.enabled, dpr: renderer.getPixelRatio()
+      };
+      marker.visible = false;
+      outlinePass.enabled = false;
+      bloomPass.enabled = true;
+      if (pose) {
+        camera.position.set(...pose.pos);
+        controls.target.set(...pose.target);
+      }
+      camera.aspect = width / height;
+      applyFov();
+      camera.lookAt(controls.target);
+      camera.updateMatrixWorld(true);
+
+      renderer.setPixelRatio(1);
+      composer.setPixelRatio(1);
+      renderer.setSize(width, height, false);
+      composer.setSize(width, height);
+      bloomPass.setSize(Math.max(Math.round(width / 2), 128), Math.max(Math.round(height / 2), 128));
+      renderer.shadowMap.needsUpdate = true;
+      composer.render(0);
+
+      // Copied out now, while the drawing buffer still holds this frame: it is
+      // not preserved, and the next frame the panel draws will overwrite it.
+      const image = document.createElement('canvas');
+      image.width = width; image.height = height;
+      image.getContext('2d').drawImage(renderer.domElement, 0, 0, width, height);
+
+      const box = new THREE.Box3(), p = new THREE.Vector3();
+      const anchors = [];
+      for (const [tag, e] of equipment) {
+        box.setFromObject(e.group);
+        if (box.isEmpty()) continue;
+        p.set((box.min.x + box.max.x) / 2, box.min.y + (box.max.y - box.min.y) * 0.62, (box.min.z + box.max.z) / 2);
+        p.project(camera);
+        const x = (p.x + 1) / 2 * width, y = (1 - p.y) / 2 * height;
+        const onScreen = p.z > -1 && p.z < 1 && x >= 0 && x <= width && y >= 0 && y <= height;
+        anchors.push({ tag, name: e.meta?.name || '', x, y, onScreen });
+      }
+
+      camera.position.copy(saved.pos);
+      controls.target.copy(saved.target);
+      camera.aspect = saved.aspect;
+      marker.visible = saved.marker;
+      outlinePass.enabled = saved.outline;
+      bloomPass.enabled = saved.bloom;
+      renderer.setPixelRatio(saved.dpr);
+      composer.setPixelRatio(saved.dpr);
+      resize();
+      return { image, anchors };
+    },
+
     /** Place the camera at a preset immediately, framed for this panel. */
     jumpTo(pos, target = [0, 4, 0]) {
       camera.position.copy(framed(pos, target));

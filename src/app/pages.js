@@ -8,6 +8,8 @@ import { backdropFor } from './backdrops.js';
 import { createHeroField } from './heroField.js';
 import { heroPlantNode } from './heroPlant.js';
 import { signature, AUTHOR } from '../shared/components/signature.js';
+import { reducedMotion } from '../shared/motion.js';
+import { createLiveTiles } from './liveTiles.js';
 
 /**
  * Page renderers.
@@ -18,7 +20,7 @@ import { signature, AUTHOR } from '../shared/components/signature.js';
  * figure here that is not a count of something that exists.
  */
 
-export function homePage(view) {
+export function homePage(view, { section = null } = {}) {
   delete document.documentElement.dataset.sim;
   invalidateTokens();
 
@@ -29,7 +31,10 @@ export function homePage(view) {
   // Scrolling happens inside .view, not on the document, so the anchors are
   // handled here rather than left to the browser's own hash behaviour — which
   // would also fight the router for the address bar.
-  const goTo = node => node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Smooth unless the reader has asked for less motion: a scroll that glides
+  // the page past is movement, and the preference is about movement.
+  const goTo = (node, smooth = true) =>
+    node.scrollIntoView({ behavior: smooth && !reducedMotion() ? 'smooth' : 'auto', block: 'start' });
 
   gallery.append(
     sectionHead('The library', 'Five process units, each with a working model behind it.',
@@ -55,10 +60,11 @@ export function homePage(view) {
         ]),
         el('p', { class: 'lede', text: 'Change an operating condition, solve the balances, and watch the same solved state appear in the 3D plant, the flowsheet, the results rail and the equations behind them. Not an animation of a process — a process model with a plant drawn on top of it.' }),
         el('div', { class: 'cta' }, [
-          el('button', {
-            class: 'btn primary',
-            html: `Explore the simulators ${icon('arrow')}`,
-            onClick: () => goTo(gallery)
+          // A link to the library route rather than a scroll of its own, so the
+          // masthead nav follows it and the address says where you are.
+          el('a', {
+            class: 'btn primary', href: href.simulators,
+            html: `Explore the simulators ${icon('arrow')}`
           }),
           el('button', {
             class: 'btn',
@@ -83,11 +89,33 @@ export function homePage(view) {
 
   clear(view).appendChild(page);
   view.scrollTop = 0;
+  // Arriving at the library from elsewhere lands on it at once. Gliding down
+  // from the top of a page that has only just appeared would be a second
+  // transition stacked on the first.
+  if (section === 'library') goTo(gallery, false);
   const disposeField = createHeroField(field);
-  return { dispose: disposeField };
+  // The five plants, running, in their own tiles. Loaded only as the library
+  // nears the screen, so the overview itself stays as light as it was.
+  const live = createLiveTiles(gallery.querySelector('.simgrid'), new Map(SIMULATORS.map(s => [s.id, s])));
+  return {
+    // Leaving the overview hands the preview renderer’s GPU context straight
+    // back: the simulator being opened is about to want one.
+    dispose() { disposeField?.(); live.dispose(); },
+    // The overview and the library are one page, so moving between them is a
+    // scroll to the right place rather than a rebuild of the same page.
+    navigate(route) {
+      if (route.name === 'simulators') { goTo(gallery); return true; }
+      if (route.name === 'home') {
+        view.scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' });
+        return true;
+      }
+      return false;
+    }
+  };
 }
 
-export function simulatorsPage(view) { return homePage(view); }
+/** The simulator library: the overview, opened at the five units. */
+export function simulatorsPage(view) { return homePage(view, { section: 'library' }); }
 
 /* --- pieces ---------------------------------------------------------------- */
 

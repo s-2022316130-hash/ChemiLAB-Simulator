@@ -21,6 +21,8 @@ import { createColourMode } from './colourMode.js';
 import { colourFor } from '../shared/ramp.js';
 import { onThemeChange } from '../shared/theme.js';
 import { createHud } from './hud.js';
+import { openExportDialog } from './exportDialog.js';
+import { getSimulator } from '../app/registry.js';
 import { createSheet } from './sheet.js';
 import { signature } from '../shared/components/signature.js';
 import { icon } from '../shared/icons.js';
@@ -52,8 +54,22 @@ export function mountWorkspace(root, sim) {
   });
   const runtime = createRuntime(sim.engine, store);
 
+  // Export is an action on this panel rather than a way of looking at it, so it
+  // sits in the panel’s header and not among the view controls on the canvas,
+  // which are about what is drawn and would wrap onto a second row with it.
+  const exportBtn = el('button', {
+    class: 'btn ghost xd-open', type: 'button', html: `${icon('download')}<span>Export</span>`,
+    title: 'Export an image of part of the plant, with its units marked and the flow diagram',
+    onClick: () => {
+      if (!view?.snapshot) return;
+      openExportDialog({
+        sim, name: getSimulator(sim.engine.id)?.name || sim.engine.id,
+        view, flowsheet, store, mode: colourMode?.mode || null, trigger: exportBtn
+      });
+    }
+  });
   const plant3d = el('div', { class: 'panel' }, [
-    el('header', {}, [el('span', { text: '3D plant' })])
+    el('header', {}, [el('span', { text: '3D plant' }), exportBtn])
   ]);
   // The vignette is a CSS gradient over the canvas rather than a post-processing
   // pass: a constant full-screen gradient costs nothing here and a whole extra
