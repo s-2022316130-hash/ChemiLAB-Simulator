@@ -206,6 +206,49 @@ own fixed plate and its own two colours and takes no token at all: the hairline 
 the bar already says which plant you are standing in, and a brand that restates it is a
 brand that moves.
 
+## Motion
+
+Movement means something changed, where it came from, or where it went. Nothing loops
+for decoration and nothing moves that the reader did not cause. Tokens are named by what
+the movement is doing — `--ease-enter` settles, `--ease-exit` leaves without lingering,
+`--ease-slide` carries a thumb between positions — and the few JavaScript waits read
+their durations from the same tokens through `shared/motion.js`, so a wait can never
+cut its own animation short.
+
+- **Navigation** fades the old page out (`--dur-exit`) before the next is built, then
+  the workspace assembles in reading order: controls, plant, results. Not a View
+  Transition: opening a simulator builds its scene synchronously in 0.6–1.9 s, and a
+  View Transition would hold the old frame frozen for exactly that long.
+- **Theme** *is* a View Transition — `setTheme` is synchronous — revealed as a circle
+  from the toggle, so the plant and the interface change in one stroke. A sequence
+  number stops a cancelled transition's clean-up removing the marker of the one that
+  replaced it.
+- **Indicators slide.** The detail level, the masthead nav and the phone tab bar each
+  draw one thumb that travels, positioned from custom properties the JS sets. Each
+  waits one frame before enabling its transition, or every page load would open with
+  it sliding in from the left.
+- **Results animate only on a new answer.** The rail redraws for other reasons too,
+  and "fresh" means *not yet painted*, not *first drawn*: a result arriving sets
+  `dirty` false straight afterwards, which redraws in the same task before anything
+  reaches the screen. A reading whose *displayed* value changed pulses once. It never
+  counts up — sweeping digits from old to new would show values no engine computed.
+- **Colour modes glide** over 0.52 s in both views: `tint()` takes a strength and the
+  renderer blends on its existing ticker; the flowsheet fill uses `--dur-4` to match.
+
+### Reduced motion
+
+Asking for less motion is asking for less *movement*. Under the preference things stop
+travelling, lifting, zooming and looping, and go on fading and changing colour — which
+is not movement, and is how a change stays visible instead of just having happened.
+The block is last in `theme.css` because a later `@keyframes` of the same name wins, so
+it swaps each travelling keyframe for a fade only while the preference is set. The 3D
+camera stops its idle orbit and cuts to presets instead of flying.
+
+This replaced a rule that zeroed every duration in the file. That was safe, and it also
+meant anyone with Windows' "Show animations" turned off — common on low-power and
+virtual machines — saw no transitions anywhere, with nothing to say one was intended.
+Do not put it back.
+
 ## Gallery photography
 
 Library tiles are backed by a still of the plant they open — a render of the actual

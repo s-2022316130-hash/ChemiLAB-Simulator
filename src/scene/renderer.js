@@ -10,6 +10,7 @@ import { REFERENCE_ASPECT, BASE_FOV } from './cameras.js';
 import { compact } from './geometry.js';
 import { makeLabel, updateLabel, selectionRing, CAPTION_DEFAULT } from './labels.js';
 import { highlight, setSceneTheme, tint } from './materials.js';
+import { reducedMotion } from '../shared/motion.js';
 import { onFrame, createQualityGovernor, damp, smoothstep } from '../shared/animation.js';
 import { token, tokenNumber, getTheme, onThemeChange } from '../shared/theme.js';
 
@@ -169,10 +170,21 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   // all off is what "captions off" means.
   let captions = handheld ? { tags: true, names: false, values: false } : { ...CAPTION_DEFAULT };
   let equipmentState = {};
-  // The colour mode currently on the plant, kept so a theme change can be
-  // re-applied to it: the tint is mixed from the palette, and the palette is
-  // what a theme change rewrites.
-  let tintMap = {};
+  // What each unit is showing right now, as a colour and a strength, and the
+  // glide from that to whatever was asked for last. Switching colour mode, or a
+  // new run arriving under one, moves the plant over a fraction of a second
+  // instead of snapping it: a unit that got hotter visibly warms, which is the
+  // thing you changed the input to see. The glide runs on the render loop that
+  // is already running, and it touches material uniforms only — no geometry,
+  // no DOM.
+  const tintShown = new Map();       // tag -> {c: THREE.Color|null, k: 0..1}
+  let tintGlide = null;              // {from, to, t, dur}
+  const TINT_GLIDE_S = 0.52;          // matches --dur-4, which the flowsheet fill uses
+  const blendTint = (a, b, e) => {
+    const ca = a.c || b.c, cb = b.c || a.c;
+    return { c: ca && cb ? ca.clone().lerp(cb, e) : null, k: a.k + (b.k - a.k) * e };
+  };
+  const showTint = (tag, s) => { const e = equipment.get(tag); if (e) tint(e.group, s.c, s.k); };
 
   const equipment = new Map();   // tag -> {group, meta, label}
   const ray = new THREE.Raycaster();
@@ -344,10 +356,10 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   const offTheme = onThemeChange(theme => {
     setSceneTheme(theme);
     // The palette the tint is mixed from has just been rewritten, so the mix
-    // has to be taken again. The ramp colours change with the theme too, and
+    // has to be taken again from what each unit is currently showing. The ramp colours change with the theme too, and
     // whoever owns the colour mode recomputes those and calls back through;
     // this keeps the plant from flashing its untinted colours in between.
-    for (const [tag, e] of equipment) tint(e.group, tintMap[tag] ?? null);
+    for (const [tag, s] of tintShown) showTint(tag, s);
     hue.set(token('--hue', '#0e7490'));
     env.apply();
     renderer.toneMappingExposure = tokenNumber('--scene-exposure', 1);
@@ -376,7 +388,9 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
     // plant on its own. It restarts the moment anyone touches it, so it reads
     // as the view settling rather than as a control being taken away.
     idle += dt;
-    if (idle > 10 && !pressed && !flying) {
+    // Not for anyone who has asked for less motion: a camera that starts moving
+    // on its own is the textbook case the preference exists for.
+    if (idle > 10 && !pressed && !flying && !reducedMotion()) {
       // About one degree and a half a second: enough that the view is alive and
       // the light moves across the equipment, slow enough that it never takes
       // the plant away from someone reading it.
@@ -424,6 +438,17 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
     }
 
     tickers.forEach(fn => fn(dt, t, gov.quality));
+
+    if (tintGlide) {
+      tintGlide.t += dt;
+      const e = smoothstep(tintGlide.t / tintGlide.dur);
+      for (const [tag, to] of tintGlide.to) {
+        const s = blendTint(tintGlide.from.get(tag) || { c: null, k: 0 }, to, e);
+        showTint(tag, s);
+        if (e >= 1) tintShown.set(tag, to);
+      }
+      if (e >= 1) { tintGlide = null; refreshShadows(); }
+    }
 
     // Static shadows, refreshed a few times a second at full quality so the
     // turning parts of the plant still cast something honest.
@@ -500,9 +525,23 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
      */
     setEquipmentTint(map) {
       const m = map || {};
-      tintMap = m;
-      for (const [tag, e] of equipment) tint(e.group, m[tag] ?? null);
-      refreshShadows();
+      const to = new Map();
+      for (const [tag] of equipment) {
+        const hex = m[tag] ?? null;
+        to.set(tag, { c: hex ? new THREE.Color(hex) : null, k: hex ? 1 : 0 });
+      }
+      // A glide already under way starts the next one from wherever it had
+      // got to, so two quick clicks never jump back to where the first began.
+      const from = new Map();
+      for (const [tag] of equipment) {
+        from.set(tag, tintGlide
+          ? blendTint(tintGlide.from.get(tag) || { c: null, k: 0 }, tintGlide.to.get(tag), smoothstep(tintGlide.t / tintGlide.dur))
+          : (tintShown.get(tag) || { c: null, k: 0 }));
+      }
+      // Kept under reduced motion: this is a change of colour, not of position,
+      // and the flowsheet beside it glides the same change as a CSS fill
+      // transition that the preference does not touch either.
+      tintGlide = { from, to, t: 0, dur: TINT_GLIDE_S };
     },
 
     /** Feed the captions the engine's equipment state, straight through. */
@@ -556,6 +595,13 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
       const p1 = framed(pos, target), t1 = new THREE.Vector3(...target);
       const dist = p0.distanceTo(p1) + t0.distanceTo(t1);
       const dur = ms ?? Math.min(1500, Math.max(520, dist * 22));
+      // With reduced motion the camera cuts to the new position. A flight is a
+      // second and a half of the whole scene swinging past, which is the kind
+      // of movement the preference is there to prevent.
+      if (reducedMotion()) {
+        camera.position.copy(p1); controls.target.copy(t1); idle = 0;
+        return;
+      }
       const start = performance.now();
       flying = true; idle = 0;
       const off = onFrame(() => {

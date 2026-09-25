@@ -2,6 +2,7 @@ import { el, clear } from '../shared/dom.js';
 import { href } from './router.js';
 import { getTheme, toggleTheme, onThemeChange } from '../shared/theme.js';
 import { icon } from '../shared/icons.js';
+import { viewTransition } from '../shared/motion.js';
 // The mark is a real file rather than a string in here, so the same artwork is
 // the masthead, the favicon and anything else that ever needs it. Inlined at
 // build time, which is also what keeps the one-file build self-contained.
@@ -52,7 +53,21 @@ export function createShell(mount) {
     themeBtn.title = dark ? 'Switch to the light theme' : 'Switch to the dark theme';
     themeBtn.setAttribute('aria-label', themeBtn.title);
   };
-  themeBtn.addEventListener('click', () => toggleTheme());
+  // The new theme spreads out from the button that asked for it. A cross-fade
+  // would say "the page changed"; a reveal from the control says "you changed
+  // it, from here" — which is the only thing a theme transition has to say.
+  // The centre of the button rather than the pointer, so a keyboard press,
+  // which has no pointer position, reveals from the same place a click does.
+  themeBtn.addEventListener('click', () => {
+    const r = themeBtn.getBoundingClientRect();
+    const x = r.left + r.width / 2, y = r.top + r.height / 2;
+    const reach = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    const root = document.documentElement.style;
+    root.setProperty('--vt-x', `${x}px`);
+    root.setProperty('--vt-y', `${y}px`);
+    root.setProperty('--vt-r', `${Math.ceil(reach)}px`);
+    viewTransition('theme', () => toggleTheme());
+  });
   onThemeChange(paintThemeBtn);
   paintThemeBtn();
 
@@ -74,11 +89,31 @@ export function createShell(mount) {
 
   mount.append(top, view);
 
+  // One indicator for the whole nav, which slides to whichever page is
+  // current, rather than an underline drawn under each link in turn. Two
+  // underlines that swap say "this one now, that one before"; one that moves
+  // says "you went from there to here", which is what navigating is.
+  //
+  // It is placed without a transition the first time, or every page load
+  // would open with the indicator sliding in from the left edge.
+  function placeIndicator() {
+    const a = nav.querySelector('a[aria-current="page"]');
+    nav.style.setProperty('--nav-on', a ? '1' : '0');
+    if (!a) return;
+    nav.style.setProperty('--nav-x', `${a.offsetLeft}px`);
+    nav.style.setProperty('--nav-w', `${a.offsetWidth}px`);
+    if (!nav.dataset.ready) requestAnimationFrame(() => { nav.dataset.ready = 'true'; });
+  }
+  // The links change padding at narrow widths, so the indicator is placed again
+  // whenever the nav changes size rather than only when the route changes.
+  if (typeof ResizeObserver === 'function') new ResizeObserver(placeIndicator).observe(nav);
+
   return {
     view,
     setRoute(route, title) {
       [...nav.children].forEach(a => a.removeAttribute('aria-current'));
       nav.children[route.name === 'home' ? 0 : 1]?.setAttribute('aria-current', 'page');
+      placeIndicator();
 
       clear(crumbs);
       if (title) {
