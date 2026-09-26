@@ -1,7 +1,7 @@
 import { el } from '../dom.js';
 export function panel({ title, right = null, body = [], cls = '' }) {
   const b = el('div', { class: 'body' }, body);
-  const p = el('div', { class: `panel ${cls}` }, [el('header', {}, [el('span', { text: title }), right].filter(Boolean)), b]);
+  const p = el('div', { class: `panel ${cls}` }, [el('header', {}, [el('h2', { class: 'panel-title', text: title }), right].filter(Boolean)), b]);
   p.body = b;
   return p;
 }

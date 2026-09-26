@@ -43,7 +43,7 @@ export function createScenarioPanel(sim, store) {
     }));
 
     if (scenario === 'fault') {
-      host.appendChild(el('div', { class: 'sect', text: 'Introduce a problem' }));
+      host.appendChild(el('h3', { class: 'sect', text: 'Introduce a problem' }));
       for (const f of set.faults) {
         const on = faults.includes(f.id);
         host.appendChild(el('label', { class: 'faultrow', dataset: { on: String(on) } }, [
@@ -65,7 +65,7 @@ export function createScenarioPanel(sim, store) {
     }
 
     if (set.challenges?.length) {
-      host.appendChild(el('div', { class: 'sect', text: 'Challenges' }));
+      host.appendChild(el('h3', { class: 'sect', text: 'Challenges' }));
       for (const c of set.challenges) {
         const g = gradeChallenge(c, result);
         const state = !g.graded ? 'idle' : g.pass ? 'pass' : 'fail';

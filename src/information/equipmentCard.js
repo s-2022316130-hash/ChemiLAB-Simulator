@@ -45,7 +45,7 @@ export function equipmentCard(info, liveValues = null) {
 
   if (liveValues && Object.keys(liveValues).length) {
     body.push(
-      el('div', { class: 'sect', dataset: { accent: 'true' }, text: 'Live from the model' }),
+      el('h3', { class: 'sect', dataset: { accent: 'true' }, text: 'Live from the model' }),
       el('div', { class: 'eq-live' }, Object.entries(liveValues).map(([k, v]) => kv(k, v)))
     );
   }
