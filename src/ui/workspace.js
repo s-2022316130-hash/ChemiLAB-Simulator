@@ -199,6 +199,14 @@ export function mountWorkspace(root, sim) {
     if (start) { view.jumpTo(start.pos, start.target); markPreset('overview'); }
 
     hud = createHud(host3d);
+    const canvas = host3d.querySelector('canvas');
+    if (canvas) {
+      const label = `3D view of the ${plantName}. Each unit is drawn in the colour of its running state; the same states are given as text.`;
+      canvas.setAttribute('role', 'img');
+      canvas.setAttribute('aria-label', label);
+      canvas.setAttribute('aria-describedby', 'plant-state-summary');
+      canvas.textContent = label;
+    }
 
     // The caption controls float over the plant: they belong to the view, and a
     // panel header already carrying seven camera presets has no room for them.
@@ -393,6 +401,11 @@ export function mountWorkspace(root, sim) {
     tintViews(eq, usable);
     // The HUD is a view of the same state and has to move with it.
     if (s.selection) hud?.show(s.selection, sim.equipmentInfo?.[s.selection], eq[s.selection] || null);
+    // Spoken state follows a finished run, and is withdrawn only when the
+    // result is (a reset or a failed run) — not while the next run is solving,
+    // or every run would be announced as if it were the first.
+    if (usable) hud?.states(eq, sim.equipmentInfo);
+    else if (s.status === Status.READY || s.status === Status.ERROR) hud?.states(null);
     // A run that produced a result describes the inputs that produced it.
     if (usable || s.status === Status.ERROR) store.set({ dirty: false });
     fab.dataset.busy = String(s.status === Status.CALCULATING || s.status === Status.CONVERGING);

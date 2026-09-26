@@ -136,13 +136,23 @@ function drawCaption({ tag, name, rows, accent, hue }) {
   return { tex, w: W, h: H };
 }
 
-const accentFor = entry => {
+/**
+ * The state a unit is in, as a word: running, warning, tripped or stopped,
+ * or null when the engine reported none. The caption colour is chosen from
+ * this, and the plant's spoken status is written from it.
+ */
+export const stateOf = entry => {
   if (!entry) return null;
-  if (entry.state === 'tripped') return STATE_COLOR.tripped;
-  if (entry.alarm || entry.state === 'warning') return STATE_COLOR.warning;
-  if (entry.state === 'running') return STATE_COLOR.running;
-  if (entry.state === 'stopped' || entry.state === 'off') return STATE_COLOR.off;
+  if (entry.state === 'tripped') return 'tripped';
+  if (entry.alarm || entry.state === 'warning') return 'warning';
+  if (entry.state === 'running') return 'running';
+  if (entry.state === 'stopped' || entry.state === 'off') return 'stopped';
   return null;
+};
+const STATE_ACCENT = { tripped: 'tripped', warning: 'warning', running: 'running', stopped: 'off' };
+const accentFor = entry => {
+  const s = stateOf(entry);
+  return s ? STATE_COLOR[STATE_ACCENT[s]] : null;
 };
 const hexOf = n => `#${new THREE.Color(n).getHexString()}`;
 
