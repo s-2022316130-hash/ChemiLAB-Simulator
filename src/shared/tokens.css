@@ -167,7 +167,12 @@
   --t-display:clamp(29px,3.8vw,48px);
   --t-h1:clamp(26px,3.4vw,38px);
   --t-h2:21px; --t-h3:16.5px;
-  --t-body:13.5px; --t-small:12.5px; --t-fine:11.5px; --t-micro:10.5px;
+  /* Nothing that is read is set below 12 px (the floor is --t-micro, and
+     --t-fine meets it), and no numeric readout below 14 px (--t-num). Every
+     size in the stylesheet is one of these tokens, so the floor is here and
+     only here. */
+  --t-body:13.5px; --t-small:12.5px; --t-fine:12px; --t-micro:12px;
+  --t-num:14px;             /* the smallest a reported value is set */
   --t-read:15px;            /* a value on a readout */
   --t-read-lg:26px;         /* a headline value */
 
