@@ -421,6 +421,35 @@ stops short of the floating Run button; the export dialog becomes a full-screen 
 one scroll with its actions pinned to the foot, and its fields are 16 px so focusing one
 does not zoom the page.
 
+## Accessibility
+
+The interface is held to WCAG 2.1 AA, with 44 × 44 targets (2.5.5) as a house rule on
+every pointer. The rules live in the tokens, so a new component inherits them:
+
+- **Text contrast (1.4.3).** Every ink token clears 4.5 : 1 on every surface and tinted
+  wash it is set on, in both themes. Text is never dimmed with `opacity` — a toggle that
+  is off is drawn in `--ink-ghost`, not faded.
+- **Control boundaries (1.4.11).** Anything you operate is edged in `--line-control`
+  (3 : 1 against both sides); `--line` and `--line-soft` are for dividers only.
+- **Targets.** `--target` (44 px) is the minimum box. A control meant to read small —
+  pills over a view, camera positions, the level switch, the theme switch — keeps a
+  full-size box and draws its visible shape inside it (`--pill-h`, `--seg-h`,
+  `--icon-h`), usually as a `::before` whose fill comes from `--pill-bg` /
+  `--pill-line`. State rules set those properties, not `background` or `border`.
+- **Type.** No text below 12 px (`--t-micro`, `--t-fine`) and no reported value below
+  14 px (`--t-num`). Every size in the stylesheet is a scale token. The exceptions are
+  text inside a picture (`role="img"`) and the flowsheet's labels, which scale with the
+  diagram and its zoom.
+- **Structure.** The simulator route has a visually hidden `h1`; every panel title is an
+  `h2` (`panel()` makes it one); section labels inside panels are `h3.sect`. Toggles
+  carry `aria-pressed` alongside `data-on` (`setOn()` in `ui/workspace.js`); the
+  camera row marks the current position with `aria-current`.
+- **The 3D plant.** The canvas is `role="img"` with a label and fallback text, described
+  by `#plant-state-summary`. Unit states are written from `stateOf()` in
+  `scene/labels.js` — the same rule that picks the caption colour — and announced
+  through the HUD's live region: counts after a fresh run, named units when three or
+  fewer change, at most one announcement every 2.5 s, nothing when nothing changed.
+
 ## Camera presets
 
 A preset declares **what it looks at**, not where the camera stands:
