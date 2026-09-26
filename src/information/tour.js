@@ -86,7 +86,7 @@ export function createTour(steps, { view, store, flowsheet, presets }) {
       const watched = (s.watch || []).map(k => [k, lookup(result, k)]).filter(e => e[1]);
       if (watched.length) {
         host.append(
-          el('div', { class: 'sect', dataset: { accent: 'true' }, text: 'Watch while you change things' }),
+          el('h3', { class: 'sect', dataset: { accent: 'true' }, text: 'Watch while you change things' }),
           el('div', { class: 'tour-watch' }, watched.map(([key, f]) => el('div', { class: 'kv' }, [
             el('span', { class: 'k', text: f.label || key }),
             el('span', {

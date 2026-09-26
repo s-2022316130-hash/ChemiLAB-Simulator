@@ -69,7 +69,7 @@ export function mountWorkspace(root, sim) {
     }
   });
   const plant3d = el('div', { class: 'panel' }, [
-    el('header', {}, [el('span', { text: '3D plant' }), exportBtn])
+    el('header', {}, [el('h2', { class: 'panel-title', text: '3D plant' }), exportBtn])
   ]);
   // The vignette is a CSS gradient over the canvas rather than a post-processing
   // pass: a constant full-screen gradient costs nothing here and a whole extra
@@ -78,7 +78,7 @@ export function mountWorkspace(root, sim) {
   plant3d.appendChild(host3d);
 
   const fsPanel = el('div', { class: 'panel' }, [
-    el('header', {}, [el('span', { text: 'Process flow diagram' }), el('span', { id: 'fsbar', class: 'btnrow' })])
+    el('header', {}, [el('h2', { class: 'panel-title', text: 'Process flow diagram' }), el('span', { id: 'fsbar', class: 'btnrow' })])
   ]);
   const hostFs = el('div', { class: 'canvas-host' });
   fsPanel.appendChild(hostFs);
@@ -134,21 +134,28 @@ export function mountWorkspace(root, sim) {
     title: 'Run the simulation', onClick: () => runtime.run()
   });
 
+  const plantName = getSimulator(sim.engine.id)?.name || sim.engine.id;
+  const heading = el('h1', { class: 'sr-only', text: `${plantName}: process simulation` });
   const workspace = el('div', { class: 'workspace' }, [left, stage, rail, fab, tabbar]);
   showTab('plant');
-  clear(root).appendChild(workspace);
+  clear(root).append(heading, workspace);
 
   /** A button that shows whether it is on rather than needing a click to find out. */
   function toggleBtn(label, initial, onChange, title) {
     const b = el('button', {
-      class: 'btn', dataset: { on: String(initial) }, text: label, title,
+      class: 'btn', type: 'button', text: label, title,
       onClick: () => {
         const next = b.dataset.on !== 'true';
-        b.dataset.on = String(next);
+        setOn(b, next);
         onChange(next);
       }
     });
+    setOn(b, initial);
     return b;
+  }
+  function setOn(b, on) {
+    b.dataset.on = String(!!on);
+    b.setAttribute('aria-pressed', String(!!on));
   }
 
   // ---- 3D -------------------------------------------------------------
@@ -181,7 +188,10 @@ export function mountWorkspace(root, sim) {
       bar.appendChild(b);
     });
     const markPreset = id => {
-      for (const [key, b] of presetBtns) b.dataset.on = String(key === id);
+      for (const [key, b] of presetBtns) {
+        b.dataset.on = String(key === id);
+        if (key === id) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current');
+      }
     };
     host3d.appendChild(bar);
 
@@ -189,6 +199,14 @@ export function mountWorkspace(root, sim) {
     if (start) { view.jumpTo(start.pos, start.target); markPreset('overview'); }
 
     hud = createHud(host3d);
+    const canvas = host3d.querySelector('canvas');
+    if (canvas) {
+      const label = `3D view of the ${plantName}. Each unit is drawn in the colour of its running state; the same states are given as text.`;
+      canvas.setAttribute('role', 'img');
+      canvas.setAttribute('aria-label', label);
+      canvas.setAttribute('aria-describedby', 'plant-state-summary');
+      canvas.textContent = label;
+    }
 
     // The caption controls float over the plant: they belong to the view, and a
     // panel header already carrying seven camera presets has no room for them.
@@ -204,7 +222,7 @@ export function mountWorkspace(root, sim) {
       if (on) {
         const restore = anyOn(remembered) ? remembered : { ...CAPTION_DEFAULT };
         view.setCaptions(restore);
-        CAPTION_FIELDS.forEach((k, i) => { detail.children[i].dataset.on = String(!!restore[k]); });
+        CAPTION_FIELDS.forEach((k, i) => { setOn(detail.children[i], restore[k]); });
       } else {
         remembered = view.captions;
         view.setCaptions({ tags: false, names: false, values: false });
@@ -215,7 +233,7 @@ export function mountWorkspace(root, sim) {
     for (const key of CAPTION_FIELDS) {
       detail.appendChild(toggleBtn(CAPTION_LABEL[key], !!initial[key], on => {
         const next = view.setCaptions({ [key]: on });
-        capBtn.dataset.on = String(anyOn(next));
+        setOn(capBtn, anyOn(next));
         if (!anyOn(next)) { remembered = { ...CAPTION_DEFAULT }; detail.style.display = 'none'; }
       }, key === 'values'
         ? 'Show the live readings the engine reported for each unit'
@@ -277,9 +295,9 @@ export function mountWorkspace(root, sim) {
     add('streams', 'Values', 'Show the calculated flow on each stream');
     fsbar.append(
       el('span', { class: 'sep' }),
-      el('button', { class: 'btn', text: '−', title: 'Zoom out', onClick: () => flowsheet.zoom(1 / 1.3) }),
-      el('button', { class: 'btn', text: 'Fit', title: 'Fit the whole diagram', onClick: () => flowsheet.fit() }),
-      el('button', { class: 'btn', text: '+', title: 'Zoom in', onClick: () => flowsheet.zoom(1.3) })
+      el('button', { class: 'btn', type: 'button', text: '−', title: 'Zoom out', 'aria-label': 'Zoom out', onClick: () => flowsheet.zoom(1 / 1.3) }),
+      el('button', { class: 'btn', type: 'button', text: 'Fit', title: 'Fit the whole diagram', 'aria-label': 'Fit the whole diagram', onClick: () => flowsheet.fit() }),
+      el('button', { class: 'btn', type: 'button', text: '+', title: 'Zoom in', 'aria-label': 'Zoom in', onClick: () => flowsheet.zoom(1.3) })
     );
 
     // Phase legend, built from the phases this flowsheet actually uses so it
@@ -383,6 +401,11 @@ export function mountWorkspace(root, sim) {
     tintViews(eq, usable);
     // The HUD is a view of the same state and has to move with it.
     if (s.selection) hud?.show(s.selection, sim.equipmentInfo?.[s.selection], eq[s.selection] || null);
+    // Spoken state follows a finished run, and is withdrawn only when the
+    // result is (a reset or a failed run) — not while the next run is solving,
+    // or every run would be announced as if it were the first.
+    if (usable) hud?.states(eq, sim.equipmentInfo);
+    else if (s.status === Status.READY || s.status === Status.ERROR) hud?.states(null);
     // A run that produced a result describes the inputs that produced it.
     if (usable || s.status === Status.ERROR) store.set({ dirty: false });
     fab.dataset.busy = String(s.status === Status.CALCULATING || s.status === Status.CONVERGING);

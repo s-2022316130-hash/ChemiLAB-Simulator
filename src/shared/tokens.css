@@ -69,14 +69,24 @@
   --line-soft:#1a2331;
   --line-strong:#33415a;
   --line-bright:#465878;
+  /* The edge of something you can operate — a button, a field, a select, a
+     segmented switch. Not a divider: WCAG 1.4.11 asks a component's boundary
+     for 3 : 1 against what is either side of it, so this is set to clear that
+     on every surface from --bg-0 to --bg-3 (3.20–3.91 : 1). The dividers above
+     stay as quiet as they were; they separate, they do not identify. */
+  --line-control:#5f7293;
+  --line-control-hi:#8594ad;
 
   /* --- 3  ink --------------------------------------------------------------
      Four weights. Headline, body, supporting, and the faint weight that labels
-     a value without competing with it. */
+     a value without competing with it. Every one of them is text, so every one
+     clears 4.5 : 1 on every surface and tinted wash it is set on (WCAG 1.4.3):
+     faint is 6.06 : 1 at its worst, ghost 4.91 : 1. The ladder is shorter than
+     it was; the hierarchy it lost is carried by size and weight instead. */
   --ink:#eaf0f8;
   --ink-dim:#a7b4c9;
-  --ink-faint:#6f7f9a;
-  --ink-ghost:#4e5c74;
+  --ink-faint:#97a5bc;
+  --ink-ghost:#8594ad;
   --ink-invert:#080c13;
 
   /* --- 4  signature hue ----------------------------------------------------
@@ -157,11 +167,26 @@
   --t-display:clamp(29px,3.8vw,48px);
   --t-h1:clamp(26px,3.4vw,38px);
   --t-h2:21px; --t-h3:16.5px;
-  --t-body:13.5px; --t-small:12.5px; --t-fine:11.5px; --t-micro:10.5px;
+  /* Nothing that is read is set below 12 px (the floor is --t-micro, and
+     --t-fine meets it), and no numeric readout below 14 px (--t-num). Every
+     size in the stylesheet is one of these tokens, so the floor is here and
+     only here. */
+  --t-body:13.5px; --t-small:12.5px; --t-fine:12px; --t-micro:12px;
+  --t-num:14px;             /* the smallest a reported value is set */
   --t-read:15px;            /* a value on a readout */
   --t-read-lg:26px;         /* a headline value */
 
-  --shell-top:56px; --rail:360px; --panel-head:38px; --col-left:320px;
+  --shell-top:56px; --rail:360px; --panel-head:44px; --col-left:320px;
+
+  /* Targets. Everything that can be operated is at least --target square
+     (WCAG 2.5.5), on every kind of pointer. A control meant to read small —
+     a pill over a view, a camera position, the level switch, the theme
+     switch — keeps a full-size box and draws its visible shape inside it, at
+     the height below, so the area you can hit grows and the drawing does not. */
+  --target:44px;
+  --pill-h:26px;            /* visible height of a pill inside its target */
+  --seg-h:34px;             /* visible height of the segmented switch */
+  --icon-h:32px;            /* visible size of an icon button */
 
   /* Elevation. Dark surfaces cannot rely on a drop shadow alone — a ring of
      light along the top edge is what actually separates them — so every level
@@ -286,11 +311,16 @@
   --line-soft:#e8eef6;
   --line-strong:#bfcbdd;
   --line-bright:#9fb0c8;
+  /* 3.09–3.58 : 1 against white, --bg-0, --bg-2 and --bg-3. */
+  --line-control:#7a88a2;
+  --line-control-hi:#5b6880;
 
+  /* 4.5 : 1 or better on every light surface and wash: faint 5.38 : 1 at its
+     worst (on --calc-soft), ghost 4.69 : 1. */
   --ink:#0d1421;
   --ink-dim:#41506a;
-  --ink-faint:#657490;
-  --ink-ghost:#8b99b0;
+  --ink-faint:#525f76;
+  --ink-ghost:#5b6880;
   --ink-invert:#ffffff;
 
   --hue:#0b7d95; --hue-deep:#075567; --hue-soft:#b4ecf4; --hue-wash:#e6f8fb;
@@ -392,3 +422,9 @@
 [data-sim="fertilizer"]{       --veil-b:color-mix(in srgb, #0f8f7a 10%, transparent); }
 [data-sim="paint"]{            --veil-b:color-mix(in srgb, #7a2ad8 11%, transparent); }
 [data-sim="gas-processing"]{   --veil-b:color-mix(in srgb, #2f4ad0 12%, transparent); }
+
+/* A finger is less precise than a pointer and a phone is held closer, so the
+   compact controls are drawn at nearly their full target there. */
+@media (pointer:coarse){
+  :root{--pill-h:32px;--seg-h:44px;--icon-h:40px}
+}
