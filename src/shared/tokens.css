@@ -171,7 +171,17 @@
   --t-read:15px;            /* a value on a readout */
   --t-read-lg:26px;         /* a headline value */
 
-  --shell-top:56px; --rail:360px; --panel-head:38px; --col-left:320px;
+  --shell-top:56px; --rail:360px; --panel-head:44px; --col-left:320px;
+
+  /* Targets. Everything that can be operated is at least --target square
+     (WCAG 2.5.5), on every kind of pointer. A control meant to read small —
+     a pill over a view, a camera position, the level switch, the theme
+     switch — keeps a full-size box and draws its visible shape inside it, at
+     the height below, so the area you can hit grows and the drawing does not. */
+  --target:44px;
+  --pill-h:26px;            /* visible height of a pill inside its target */
+  --seg-h:34px;             /* visible height of the segmented switch */
+  --icon-h:32px;            /* visible size of an icon button */
 
   /* Elevation. Dark surfaces cannot rely on a drop shadow alone — a ring of
      light along the top edge is what actually separates them — so every level
@@ -407,3 +417,9 @@
 [data-sim="fertilizer"]{       --veil-b:color-mix(in srgb, #0f8f7a 10%, transparent); }
 [data-sim="paint"]{            --veil-b:color-mix(in srgb, #7a2ad8 11%, transparent); }
 [data-sim="gas-processing"]{   --veil-b:color-mix(in srgb, #2f4ad0 12%, transparent); }
+
+/* A finger is less precise than a pointer and a phone is held closer, so the
+   compact controls are drawn at nearly their full target there. */
+@media (pointer:coarse){
+  :root{--pill-h:32px;--seg-h:44px;--icon-h:40px}
+}
