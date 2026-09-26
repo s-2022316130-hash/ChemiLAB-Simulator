@@ -69,14 +69,24 @@
   --line-soft:#1a2331;
   --line-strong:#33415a;
   --line-bright:#465878;
+  /* The edge of something you can operate — a button, a field, a select, a
+     segmented switch. Not a divider: WCAG 1.4.11 asks a component's boundary
+     for 3 : 1 against what is either side of it, so this is set to clear that
+     on every surface from --bg-0 to --bg-3 (3.20–3.91 : 1). The dividers above
+     stay as quiet as they were; they separate, they do not identify. */
+  --line-control:#5f7293;
+  --line-control-hi:#8594ad;
 
   /* --- 3  ink --------------------------------------------------------------
      Four weights. Headline, body, supporting, and the faint weight that labels
-     a value without competing with it. */
+     a value without competing with it. Every one of them is text, so every one
+     clears 4.5 : 1 on every surface and tinted wash it is set on (WCAG 1.4.3):
+     faint is 6.06 : 1 at its worst, ghost 4.91 : 1. The ladder is shorter than
+     it was; the hierarchy it lost is carried by size and weight instead. */
   --ink:#eaf0f8;
   --ink-dim:#a7b4c9;
-  --ink-faint:#6f7f9a;
-  --ink-ghost:#4e5c74;
+  --ink-faint:#97a5bc;
+  --ink-ghost:#8594ad;
   --ink-invert:#080c13;
 
   /* --- 4  signature hue ----------------------------------------------------
@@ -286,11 +296,16 @@
   --line-soft:#e8eef6;
   --line-strong:#bfcbdd;
   --line-bright:#9fb0c8;
+  /* 3.09–3.58 : 1 against white, --bg-0, --bg-2 and --bg-3. */
+  --line-control:#7a88a2;
+  --line-control-hi:#5b6880;
 
+  /* 4.5 : 1 or better on every light surface and wash: faint 5.38 : 1 at its
+     worst (on --calc-soft), ghost 4.69 : 1. */
   --ink:#0d1421;
   --ink-dim:#41506a;
-  --ink-faint:#657490;
-  --ink-ghost:#8b99b0;
+  --ink-faint:#525f76;
+  --ink-ghost:#5b6880;
   --ink-invert:#ffffff;
 
   --hue:#0b7d95; --hue-deep:#075567; --hue-soft:#b4ecf4; --hue-wash:#e6f8fb;

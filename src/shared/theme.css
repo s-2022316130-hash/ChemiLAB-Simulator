@@ -129,7 +129,7 @@ hr{border:0;border-top:1px solid var(--line-soft);margin:14px 0}
   font-family:var(--mono);font-size:var(--t-micro);letter-spacing:.1em;text-transform:uppercase;
   color:var(--ink-ghost);white-space:nowrap;overflow:hidden;
 }
-.crumbs i{font-style:normal;color:var(--line-strong)}
+.crumbs i{font-style:normal;color:var(--ink-ghost)}
 .crumbs .here{
   color:var(--hue);overflow:hidden;text-overflow:ellipsis;
   display:inline-flex;align-items:center;gap:6px;
@@ -156,11 +156,11 @@ hr{border:0;border-top:1px solid var(--line-soft);margin:14px 0}
 
 .iconbtn{
   width:32px;height:32px;display:grid;place-items:center;border-radius:var(--r-sm);cursor:pointer;
-  background:var(--bg-2);border:1px solid var(--line);color:var(--ink-dim);flex:0 0 auto;
+  background:var(--bg-2);border:1px solid var(--line-control);color:var(--ink-dim);flex:0 0 auto;
   transition:background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
              border-color var(--dur-1) var(--ease), transform var(--dur-1) var(--spring);
 }
-.iconbtn:hover{background:var(--bg-3);color:var(--ink);border-color:var(--line-strong);transform:translateY(-1px)}
+.iconbtn:hover{background:var(--bg-3);color:var(--ink);border-color:var(--line-control-hi);transform:translateY(-1px)}
 .iconbtn:active{transform:translateY(0)}
 .iconbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 
@@ -280,7 +280,7 @@ hr{border:0;border-top:1px solid var(--line-soft);margin:14px 0}
 .field-val input[type=number]::-webkit-outer-spin-button,
 .field-val input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .field-val input[type=number]{-moz-appearance:textfield;appearance:textfield}
-.field-val input[type=number]:hover{background:var(--bg-2);border-color:var(--line)}
+.field-val input[type=number]:hover{background:var(--bg-2);border-color:var(--line-control)}
 .field-val input[type=number]:focus{
   outline:none;background:var(--bg-2);border-color:var(--accent);box-shadow:var(--sh-glow);
 }
@@ -292,12 +292,12 @@ hr{border:0;border-top:1px solid var(--line-soft);margin:14px 0}
    field — still behaves like a normal stacked control. */
 .field select,.field input[type=text]{
   width:100%;padding:8px 11px;background:var(--bg-2);
-  border:1px solid var(--line);border-radius:var(--r-sm);color:var(--ink);
+  border:1px solid var(--line-control);border-radius:var(--r-sm);color:var(--ink);
   font-family:var(--font);font-size:var(--t-small);
   transition:border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease),
              background var(--dur-1) var(--ease);
 }
-.field select:hover,.field input[type=text]:hover{border-color:var(--line-strong);background:var(--bg-3)}
+.field select:hover,.field input[type=text]:hover{border-color:var(--line-control-hi);background:var(--bg-3)}
 .field select:focus,.field input[type=text]:focus{
   outline:none;border-color:var(--accent);background:var(--bg-2);box-shadow:var(--sh-glow);
 }
@@ -354,24 +354,24 @@ select.casesel,.field select{
   padding-right:30px;
 }
 select.casesel{
-  width:100%;padding:8px 30px 8px 11px;background-color:var(--bg-2);border:1px solid var(--line);
+  width:100%;padding:8px 30px 8px 11px;background-color:var(--bg-2);border:1px solid var(--line-control);
   border-radius:var(--r-sm);color:var(--ink);font-family:var(--font);font-size:var(--t-small);
   cursor:pointer;transition:border-color var(--dur-1) var(--ease), background-color var(--dur-1) var(--ease);
 }
-select.casesel:hover:not(:disabled){border-color:var(--line-strong);background-color:var(--bg-3)}
+select.casesel:hover:not(:disabled){border-color:var(--line-control-hi);background-color:var(--bg-3)}
 select.casesel:focus{outline:none;border-color:var(--accent);box-shadow:var(--sh-glow)}
 select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 
 /* Buttons. Three weights: primary (one per view), normal, and ghost. */
 .btn{
-  padding:7px 13px;background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:7px 13px;background:var(--bg-2);border:1px solid var(--line-control);border-radius:var(--r-sm);
   cursor:pointer;font-size:var(--t-small);font-weight:500;color:var(--ink-dim);
   display:inline-flex;align-items:center;gap:7px;white-space:nowrap;
   transition:background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
              border-color var(--dur-1) var(--ease), transform var(--dur-1) var(--spring),
              box-shadow var(--dur-1) var(--ease);
 }
-.btn:hover{background:var(--bg-3);color:var(--ink);border-color:var(--line-strong);transform:translateY(-1px);box-shadow:var(--sh-1)}
+.btn:hover{background:var(--bg-3);color:var(--ink);border-color:var(--line-control-hi);transform:translateY(-1px);box-shadow:var(--sh-1)}
 .btn:active{transform:translateY(0) scale(.985)}
 .btn.primary{
   background:linear-gradient(180deg, color-mix(in srgb,var(--hue) 88%, var(--n-000)), var(--hue));
@@ -390,7 +390,7 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
    as three actions; this reads as one setting. */
 .seg{
   display:inline-flex;padding:2px;gap:2px;border-radius:var(--r-sm);
-  background:var(--bg-2);border:1px solid var(--line);width:100%;
+  background:var(--bg-2);border:1px solid var(--line-control);width:100%;
 }
 .seg button{
   flex:1 1 0;min-width:0;padding:6px 8px;border:0;border-radius:var(--r-xs);background:transparent;
@@ -913,7 +913,7 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   background:var(--hue-wash);color:var(--hue);
   border-color:color-mix(in srgb,var(--hue) 34%,transparent);
 }
-.canvas-toolbar .btn[data-on="false"],#presetbar .btn[data-on="false"],#fsbar .btn[data-on="false"]{opacity:.55}
+.canvas-toolbar .btn[data-on="false"],#presetbar .btn[data-on="false"],#fsbar .btn[data-on="false"]{color:var(--ink-ghost)}
 .canvas-toolbar .sep,#presetbar .sep,#fsbar .sep{width:1px;height:14px;background:var(--line);margin:0 3px;flex:0 0 auto}
 .canvas-toolbar .btnrow{flex-wrap:nowrap;gap:2px}
 #presetbar,#fsbar{gap:2px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%}
@@ -941,12 +941,12 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   flex:0 0 auto;cursor:pointer;white-space:nowrap;
   padding:5px 12px;border-radius:var(--r-pill,999px);
   font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;
-  color:var(--ink-dim);background:var(--canvas-chip);border:1px solid var(--line);
+  color:var(--ink-dim);background:var(--canvas-chip);border:1px solid var(--line-control);
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   transition:background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
              border-color var(--dur-1) var(--ease), transform var(--dur-1) var(--spring);
 }
-.canvas-presets .cam:hover{color:var(--ink);border-color:var(--line-strong);transform:translateY(-1px)}
+.canvas-presets .cam:hover{color:var(--ink);border-color:var(--line-control-hi);transform:translateY(-1px)}
 .canvas-presets .cam:active{transform:translateY(0)}
 .canvas-presets .cam[data-on="true"]{
   background:var(--hue);color:var(--on-accent);border-color:transparent;
@@ -1221,10 +1221,12 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 .plate-chart{
   position:absolute;z-index:0;margin:0;pointer-events:none;
   right:30px;top:30px;bottom:30px;width:64%;
+}
+.psychro{
+  display:block;width:100%;height:100%;
   -webkit-mask-image:radial-gradient(125% 115% at 100% 62%, #000 34%, transparent 80%);
   mask-image:radial-gradient(125% 115% at 100% 62%, #000 34%, transparent 80%);
 }
-.psychro{display:block;width:100%;height:100%}
 .psychro path{fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:0}
 .ps-g{stroke:var(--engrave);stroke-width:1.4}
 .ps-hl{stroke:var(--engrave);stroke-width:1.4}
@@ -1233,7 +1235,7 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 .ps-ticks text{font-family:var(--mono);font-size:15px;fill:var(--brass-ink);opacity:.55}
 .plate-chart figcaption{
   position:absolute;right:14px;bottom:6px;
-  font-family:var(--serif);font-style:italic;font-size:13px;color:var(--ink-faint);opacity:.8;
+  font-family:var(--serif);font-style:italic;font-size:13px;color:var(--ink-faint);
 }
 
 /* The page's one orchestrated moment: the chart engraves itself when the
@@ -1282,7 +1284,8 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 
 @media (max-width:1060px){
   .hero.plate{padding:72px 50px 50px}
-  .plate-chart{width:100%;opacity:.85}
+  .plate-chart{width:100%}
+  .plate-chart .psychro{opacity:.85}
   .zones.z-top span:nth-child(n+7),.zones.z-bottom span:nth-child(n+7){display:none}
 }
 @media (max-width:680px){
@@ -1294,7 +1297,8 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   .z-bottom{bottom:8px}
   .z-left,.z-right,.cm-l,.cm-r{display:none}
   .zones.z-top span:nth-child(n+5),.zones.z-bottom span:nth-child(n+5){display:none}
-  .plate-chart{right:22px;top:22px;bottom:22px;opacity:.7}
+  .plate-chart{right:22px;top:22px;bottom:22px}
+  .plate-chart .psychro{opacity:.7}
   .plate-chart figcaption{display:none}
   .titleblock{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:34px}
   .titleblock > div:nth-child(3){border-left:0}
@@ -1429,9 +1433,7 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 .simtile .launch{
   display:inline-flex;align-items:center;gap:7px;
   font-size:var(--t-fine);font-weight:600;color:var(--card-hue,var(--hue));
-  opacity:.88;transition:opacity var(--dur-2) var(--ease);
 }
-.simtile:hover .launch{opacity:1}
 .simtile[data-state=planned]{opacity:.6;--card-hue:var(--ink-ghost)}
 .simtile[data-state=planned]:hover{transform:none;box-shadow:var(--sh-1),var(--edge)}
 
@@ -1861,7 +1863,6 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   .simtile .tile-top{margin-bottom:8px}
   .simtile h3{font-size:21px}
   .simtile .tile-facts{margin-top:6px}
-  .simtile .launch{opacity:1}
   .signature{padding:34px 0 40px}
   .legend{left:8px;bottom:6px;font-size:8.5px;gap:8px;padding:4px 8px}
   .canvas-toolbar{top:8px;right:8px;left:auto}
@@ -2088,9 +2089,8 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
    longer uses. A readout, not a control, so it carries no chrome. */
 .canvas-perf{
   position:absolute;top:13px;left:12px;z-index:3;pointer-events:auto;
-  background:transparent;border-color:transparent;padding:2px 4px;opacity:.85;
+  background:transparent;border-color:transparent;padding:2px 4px;
 }
-.canvas-perf[data-tier="low"]{opacity:1}
 
 /* ===========================================================================
    EXPORT
