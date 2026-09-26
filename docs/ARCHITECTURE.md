@@ -201,6 +201,24 @@ and the sky. It is set before the workspace mounts, because the renderer reads i
 construction. Entering a simulator is meant to feel like entering a different facility
 while the system around it stays identical.
 
+### The overview plate
+
+The overview is laid out as a drawing sheet rather than a landing page: the hero is a
+plate with a double border, ISO 5457 zone references and centring marks, a title block
+of what the library holds, and behind the headline a psychrometric chart
+(`app/psychro.js`). The chart is computed, not drawn — Magnus–Tetens saturation
+pressure, humidity ratio `w = 0.621945 φ p_s / (P − φ p_s)` and moist-air enthalpy at
+101.325 kPa — and carries no state; it is the subject's own drawing used as ground, and
+it engraves itself once when the page opens (paths in order, grid first, saturation
+last). The home-only ground, grain and brass rules come from `--ground-*`, `--plate*`,
+`--brass*` and `--engrave*` tokens under `:root[data-page="home"]`, which the overview
+sets on mount and removes on dispose, so no other page inherits them.
+
+Type is Inter for the interface, Source Serif 4 for display on the overview, IBM Plex
+Mono for tags and values. All three are bundled from `@fontsource` (OFL 1.1) through
+`shared/fonts.css`, limited to the subsets the text uses, so the single-file build opens
+with the right faces and no network.
+
 The one exception is the mark in the masthead. `assets/chemilab-logo.svg` carries its
 own fixed plate and its own two colours and takes no token at all: the hairline under
 the bar already says which plant you are standing in, and a brand that restates it is a
@@ -304,6 +322,54 @@ the same drawing at a third of the size.
   use, because an SVG drawn as an image sees none of the page's stylesheet. The dash on a
   flowing line is the one CSS-only style that matters, and it is written onto the clone.
 
+### Formats and options
+
+| Option | Choices |
+|---|---|
+| Format | **PNG** image, or **PDF** document |
+| Size | PNG: standard 2400 × 1800 or high 4800 × 3600. PDF: A4, A3 or US Letter, landscape |
+| Sheet colours | **Match the app** (theme in force), or **White paper** for printing |
+| Include | callouts, readings on callouts, flow diagram, legend, **data appendix** |
+| Sheet details | title, prepared by, notes |
+
+- **A PDF sheet is composed to the paper's proportions.** `composeSheet({ aspect })`
+  keeps the height at 1800 and widens the sheet, so the picture and lower band grow with
+  it and page 1 is filled edge to edge rather than letterboxed. It is rasterised at a
+  little over 300 dpi and placed as a JPEG.
+- **White paper is the light theme's palette, read from the stylesheet.**
+  `sheetPalette('white', simId)` resolves tokens on a hidden probe carrying
+  `data-theme="light"` and the simulator — so no second palette exists — re-declares
+  the two root aliases (`--accent`, `--accent-deep`) that would otherwise inherit the
+  dark values, and sets the ground to white. The 3D picture keeps its on-screen lighting.
+- **Details are the exporter's, not the model's.** A title replaces the plant name in
+  the title block (the plant is still named on the line under it); "prepared by" is a
+  title-block field and the PDF's Author; notes fill whatever room the headline panel
+  has left and appear in full in the appendix.
+- **The data appendix** (`ui/exportAppendix.js`) carries what a picture cannot: the
+  run (status, convergence, iterations, residual, solve time, each convergence trace,
+  balance closures, case, faults), every reading the engine reported for the units on
+  the sheet, every stream, and the notes. It is laid out once as drawing operations in
+  points and drawn by either backend — onto the canvas under a PNG's sheet, or into PDF
+  pages as real text — so the two formats cannot disagree. Tables repeat their header on
+  a new page, a unit split by a page break is named again "(continued)", and the last
+  three rows of a table never strand on a page of their own.
+- **The PDF writer is `shared/pdf.js`**, not a library: the app ships as one offline
+  HTML file, and what is needed is small — PDF 1.4, the base-14 fonts (nothing embedded),
+  JPEG images stored as they are, uncompressed content streams and a cross-reference
+  table. Text is WinAnsi; characters outside it are written as their nearest plain
+  equivalent (`CO₂` → `CO2`, `−` → `-`) rather than dropped. Columns are measured
+  with Helvetica-compatible metrics so right alignment and cell fitting hold in any
+  reader.
+- **The file is described before it is made.** The dialog shows the page strip (every
+  page of the output as a thumbnail, each viewable at full preview size), the file type,
+  pixel size or paper and dpi, page count, and the run's status. Format, size, paper,
+  colours, the appendix choice (remembered per format — on for PDF, off for PNG) and the
+  preparer's name are remembered in this browser only.
+- **Device limits are applied up front.** A canvas past a browser's pixel cap draws
+  nothing — on iOS Safari about 16.7 MP — so on a touch device the export scale is capped
+  under it and the summary says "the most this device can draw" instead of the download
+  failing.
+
 ## Gallery photography
 
 Library tiles are backed by a still of the plant they open — a render of the actual
@@ -346,6 +412,14 @@ Three column widths, one component language:
 The phone layout is a CSS decision driven by `data-active` attributes, so nothing is
 rebuilt when the window changes size and the WebGL context is never lost — a tab that
 unmounted the canvas would have to recompile every shader on the way back.
+
+On a phone (≤ 640 px) the overview's library tiles become cards with the plant as a
+band above the text, at full strength, rather than a photograph dimmed behind it — with
+no hover on a touch screen, a dimmed photograph never brightens. The masthead is sized to
+hold the mark, name, both destinations and the theme switch in 375 px; the camera row
+stops short of the floating Run button; the export dialog becomes a full-screen sheet in
+one scroll with its actions pinned to the foot, and its fields are 16 px so focusing one
+does not zoom the page.
 
 ## Camera presets
 

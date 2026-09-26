@@ -143,8 +143,14 @@
   --pad:14px;
   --gap:12px;
 
-  --font:"Inter","Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
+  --font:"Inter Variable","Inter","Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  /* The display serif, for headings on the overview only. Source Serif 4 at
+     its display optical size: a scholarly face with real contrast at large
+     sizes, which is the register of an engineering department rather than of
+     an app. It never sets interface text — that stays Inter, and readings stay
+     Plex Mono. */
+  --serif:"Source Serif 4 Variable","Source Serif 4",Georgia,"Times New Roman",serif;
 
   /* Type scale. Values in the interface are set in the mono face with tabular
      figures throughout, so a column of readings lines up on the decimal. */
@@ -174,6 +180,17 @@
      gradient anyone notices. */
   --grid-line:rgba(140,170,210,.045);
   --grid-size:46px;
+
+  /* The overview as a drawing plate (HOME in theme.css). Brass is the one
+     accent it adds, and it is used only as a rule or a small figure, never as
+     a fill: the fine lines of a sheet border and the numbers in a title block,
+     the way brass turns up on an instrument as a bezel and not as the dial. */
+  --ground-a:#070b12; --ground-b:#0a1019;
+  --plate:#0b121c; --plate-hi:#0e1724;
+  --brass:#c6a36b;
+  --brass-line:rgba(198,163,107,.36); --brass-rule:rgba(198,163,107,.17); --brass-ink:rgba(198,163,107,.7);
+  --engrave:rgba(150,178,210,.10); --engrave-mid:rgba(150,178,210,.17); --engrave-sat:rgba(198,163,107,.46);
+  --grain:.075;
   --veil-a:color-mix(in srgb, var(--hue) 14%, transparent);
   --veil-b:color-mix(in srgb, #3f6fd8 9%, transparent);
 
@@ -320,6 +337,13 @@
   --edge-strong:inset 0 1px 0 rgba(255,255,255,1);
 
   --grid-line:rgba(40,70,110,.055);
+  /* Laboratory porcelain, not cream: a cool white with graphite ink. */
+  --ground-a:#eef1f4; --ground-b:#f4f6f8;
+  --plate:#fbfcfd; --plate-hi:#ffffff;
+  --brass:#86662b;
+  --brass-line:rgba(134,102,43,.42); --brass-rule:rgba(134,102,43,.2); --brass-ink:rgba(134,102,43,.78);
+  --engrave:rgba(40,70,110,.085); --engrave-mid:rgba(40,70,110,.15); --engrave-sat:rgba(134,102,43,.5);
+  --grain:.05;
   --veil-a:color-mix(in srgb, var(--hue) 10%, transparent);
   --veil-b:color-mix(in srgb, #3f6fd8 7%, transparent);
 

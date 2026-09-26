@@ -1141,35 +1141,10 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   grid-area:art;min-width:0;display:flex;justify-content:center;align-items:center;
   animation:fade-in var(--dur-4) var(--ease-out) backwards;animation-delay:220ms;
 }
-.hero .herostats{grid-area:stats}
-.hero-field{
-  position:absolute;inset:-40px -50vw 26% 40%;z-index:-1;pointer-events:none;overflow:hidden;
-  mask-image:linear-gradient(180deg,transparent,#000 16%,#000 70%,transparent);
-  -webkit-mask-image:linear-gradient(180deg,transparent,#000 16%,#000 70%,transparent);
-}
-@media (max-width:1060px){ .hero-field{display:none} }
-.hero-field canvas{display:block;width:100%;height:100%}
-.eyebrow{
-  display:inline-flex;align-items:center;gap:9px;margin-bottom:20px;
-  font-family:var(--mono);font-size:var(--t-micro);letter-spacing:.16em;text-transform:uppercase;
-  color:var(--hue);background:var(--hue-wash);
-  border:1px solid color-mix(in srgb,var(--hue) 28%,transparent);
-  padding:5px 13px;border-radius:var(--r-xs);
-  animation:fade-up var(--dur-3) var(--ease-out) backwards;
-}
-.eyebrow::before{
-  content:"";width:5px;height:5px;border-radius:50%;background:var(--hue);
-  box-shadow:0 0 9px var(--hue);animation:breathe 2.6s var(--ease-in-out) infinite;
-}
 .hero h1{
   font-size:var(--t-display);margin:0 0 18px;letter-spacing:-.038em;line-height:1.05;font-weight:660;
   max-width:20ch;text-wrap:balance;
   animation:fade-up var(--dur-4) var(--ease-out) backwards;animation-delay:60ms;
-}
-.hero h1 em{
-  font-style:normal;
-  background:linear-gradient(100deg,var(--hue),color-mix(in srgb,var(--hue) 45%, var(--ink)));
-  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
 }
 .hero .lede{
   color:var(--ink-dim);max-width:60ch;margin:0 0 28px;font-size:var(--t-read);line-height:1.65;
@@ -1179,31 +1154,154 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 .hero .cta .btn{padding:10px 18px;font-size:var(--t-body)}
 .hero .cta .btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 
-/* A strip of measured facts under the hero. Every number here is a count of
-   something in the repository, not a marketing figure. */
-.herostats{
-  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin-top:38px;
-  border-top:1px solid var(--line);
+/* --- the drawing plate ------------------------------------------------------
+   The overview's hero is laid out as a sheet from a drawing office, and every
+   piece of it is furniture a drawing actually carries: a double border with the
+   zone references between its rules, a centring mark at the middle of each
+   edge, a chart engraved into the ground, the subject in elevation, and the
+   facts recorded in a title block. The one bold thing on the page; everything
+   around it stays quiet. */
+
+/* The overview's own ground. No grid — the plate carries the drawing
+   furniture now, and a grid under it as well would be two sheets at once — but
+   ink (porcelain in daylight) with two faint pools of light and a grain, so the
+   page reads as a surface rather than as a flat fill. The grain is a static
+   tile at low opacity with no blend mode: blending a fixed layer against
+   scrolling content repaints the whole viewport on every scroll frame. */
+:root[data-page="home"] body::before{
+  background:
+    radial-gradient(1100px 720px at 84% -10%, color-mix(in srgb, var(--brass) 8%, transparent), transparent 62%),
+    radial-gradient(940px 780px at -12% 10%, color-mix(in srgb, var(--hue) 8%, transparent), transparent 64%),
+    linear-gradient(180deg, var(--ground-a), var(--ground-b) 72%);
+}
+:root[data-page="home"] body::after{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:var(--grain);
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+}
+
+.hero.plate{
+  margin-top:26px;padding:84px 66px 60px;overflow:hidden;
+  background:linear-gradient(180deg, var(--plate-hi), var(--plate));
+  box-shadow:0 44px 90px -52px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.035);
+}
+[data-theme="light"] .hero.plate{box-shadow:0 34px 70px -44px rgba(20,40,70,.26), 0 1px 2px rgba(20,40,70,.06)}
+.hero.plate .hero-copy,.hero.plate .hero-art,.hero.plate .titleblock{position:relative;z-index:2}
+
+/* The sheet border: two rules, the zone band between them. */
+.plate-frame{position:absolute;inset:0;z-index:1;pointer-events:none}
+.plate-frame::before,.plate-frame::after{content:"";position:absolute;pointer-events:none}
+.plate-frame::before{inset:12px;border:1px solid var(--brass-line)}
+.plate-frame::after{inset:30px;border:1px solid var(--brass-rule)}
+.zones{
+  position:absolute;display:flex;
+  font-family:var(--mono);font-size:9px;line-height:1;color:var(--brass-ink);font-variant-numeric:tabular-nums;
+}
+.zones span{flex:1 1 0;display:grid;place-items:center;border-left:1px solid var(--brass-rule)}
+.zones span:first-child{border-left:0}
+.z-top,.z-bottom{left:30px;right:30px;height:18px}
+.z-top{top:12px}
+.z-bottom{bottom:12px}
+.z-left,.z-right{top:30px;bottom:30px;width:18px;flex-direction:column}
+.z-left{left:12px}
+.z-right{right:12px}
+.z-left span,.z-right span{border-left:0;border-top:1px solid var(--brass-rule)}
+.z-left span:first-child,.z-right span:first-child{border-top:0}
+/* Centring marks: a short stroke across both rules at each edge's midpoint. */
+.cmark{position:absolute;background:var(--brass-line)}
+.cm-t,.cm-b{left:50%;width:1px;height:30px;margin-left:-.5px}
+.cm-t{top:4px}
+.cm-b{bottom:4px}
+.cm-l,.cm-r{top:50%;height:1px;width:30px;margin-top:-.5px}
+.cm-l{left:4px}
+.cm-r{right:4px}
+
+/* The engraved chart. Hairlines in the ground's own tone, the saturation curve
+   in brass, masked so it rises out of the sheet on the right and is gone well
+   before it reaches the headline. */
+.plate-chart{
+  position:absolute;z-index:0;margin:0;pointer-events:none;
+  right:30px;top:30px;bottom:30px;width:64%;
+  -webkit-mask-image:radial-gradient(125% 115% at 100% 62%, #000 34%, transparent 80%);
+  mask-image:radial-gradient(125% 115% at 100% 62%, #000 34%, transparent 80%);
+}
+.psychro{display:block;width:100%;height:100%}
+.psychro path{fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:0}
+.ps-g{stroke:var(--engrave);stroke-width:1.4}
+.ps-hl{stroke:var(--engrave);stroke-width:1.4}
+.ps-r{stroke:var(--engrave-mid);stroke-width:1.6}
+.ps-sat{stroke:var(--engrave-sat);stroke-width:2.2}
+.ps-ticks text{font-family:var(--mono);font-size:15px;fill:var(--brass-ink);opacity:.55}
+.plate-chart figcaption{
+  position:absolute;right:14px;bottom:6px;
+  font-family:var(--serif);font-style:italic;font-size:13px;color:var(--ink-faint);opacity:.8;
+}
+
+/* The page's one orchestrated moment: the chart engraves itself when the
+   overview opens — the grid, then the enthalpy lines, the humidity curves from
+   dry to wet, and saturation last. Each path's final state is its resting
+   style, so a browser that never runs the animation still shows the chart. */
+@keyframes engrave{from{stroke-dashoffset:1}}
+@keyframes engrave-in{from{opacity:0}}
+.ps-g{animation:engrave-in 900ms var(--ease) backwards}
+.ps-hl{animation:engrave 1400ms var(--ease-enter) backwards;animation-delay:calc(220ms + var(--i,0) * 40ms)}
+.ps-r{animation:engrave 1700ms var(--ease-enter) backwards;animation-delay:calc(360ms + var(--i,0) * 85ms)}
+.ps-sat{animation:engrave 1900ms var(--ease-enter) backwards;animation-delay:1050ms}
+.ps-ticks{animation:engrave-in 800ms var(--ease) backwards;animation-delay:1500ms}
+
+/* Type. The headline is set whole, in the display serif, with nothing picked
+   out in it: the sentence does its own work. */
+.hero.plate h1{
+  font-family:var(--serif);font-weight:500;font-size:clamp(40px,5vw,70px);
+  line-height:1.03;letter-spacing:-.018em;max-width:13ch;margin:0 0 24px;text-wrap:balance;
+}
+.hero.plate .lede{font-size:17px;line-height:1.62;max-width:52ch;color:var(--ink-dim);margin-bottom:30px}
+
+/* The title block: what the library holds, as a drawing records its sheet
+   data — field name small, the figure in the serif, cells ruled in brass. */
+.titleblock{
+  grid-area:stats;margin:48px 0 0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  border:1px solid var(--brass-line);
+  background:color-mix(in srgb, var(--plate) 72%, transparent);
   animation:fade-up var(--dur-4) var(--ease-out) backwards;animation-delay:240ms;
 }
-.herostats div{
-  position:relative;padding:18px 22px 0 0;margin-right:22px;
-  border-right:1px solid var(--line-soft);min-width:0;
+.titleblock > div{padding:13px 18px 15px;border-left:1px solid var(--brass-rule);min-width:0}
+.titleblock > div:first-child{border-left:0}
+.titleblock dt{font-size:12px;line-height:1.3;color:var(--ink-faint)}
+.titleblock dd{
+  margin:7px 0 0;font-family:var(--serif);font-weight:500;font-size:34px;line-height:1;
+  color:var(--ink);letter-spacing:-.01em;font-variant-numeric:lining-nums tabular-nums;
 }
-.herostats div:last-child{border-right:0;margin-right:0}
-/* A tick of the accent above each figure, the way a scale is marked. */
-.herostats div::before{
-  content:"";position:absolute;left:0;top:-1px;width:20px;height:2px;background:var(--hue);
-  box-shadow:0 0 8px var(--hue-glow);
+
+/* The overview's section headings share the headline's face, so the page
+   reads as one document rather than a hero bolted onto an app. */
+:root[data-page="home"] .sec-head h2{
+  font-family:var(--serif);font-weight:500;font-size:clamp(28px,3vw,40px);
+  letter-spacing:-.014em;line-height:1.08;margin:0 0 10px;
 }
-.herostats b{
-  display:block;font-family:var(--mono);font-size:30px;font-weight:600;color:var(--ink);
-  letter-spacing:-.045em;line-height:1.05;font-variant-numeric:tabular-nums;
+:root[data-page="home"] .sec-head p{font-size:var(--t-body);max-width:64ch}
+
+@media (max-width:1060px){
+  .hero.plate{padding:72px 50px 50px}
+  .plate-chart{width:100%;opacity:.85}
+  .zones.z-top span:nth-child(n+7),.zones.z-bottom span:nth-child(n+7){display:none}
 }
-.herostats span{
-  display:block;margin-top:5px;font-family:var(--mono);font-size:9px;letter-spacing:.13em;
-  text-transform:uppercase;color:var(--ink-faint);line-height:1.4;
+@media (max-width:680px){
+  .hero.plate{margin-top:14px;padding:56px 32px 36px}
+  .plate-frame::before{inset:8px}
+  .plate-frame::after{inset:22px}
+  .z-top,.z-bottom{left:22px;right:22px;height:14px}
+  .z-top{top:8px}
+  .z-bottom{bottom:8px}
+  .z-left,.z-right,.cm-l,.cm-r{display:none}
+  .zones.z-top span:nth-child(n+5),.zones.z-bottom span:nth-child(n+5){display:none}
+  .plate-chart{right:22px;top:22px;bottom:22px;opacity:.7}
+  .plate-chart figcaption{display:none}
+  .titleblock{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:34px}
+  .titleblock > div:nth-child(3){border-left:0}
+  .titleblock > div:nth-child(n+3){border-top:1px solid var(--brass-rule)}
+  .titleblock dd{font-size:28px}
 }
+
 
 /* --- the plant in elevation ------------------------------------------------
    Drawn the way a general-arrangement sheet is drawn: one weight for the
@@ -1239,11 +1337,6 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 .sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin:0 0 22px}
 .sec-head h2{font-size:var(--t-h2);margin:0 0 5px;letter-spacing:-.025em;text-wrap:balance}
 .sec-head p{margin:0;color:var(--ink-faint);font-size:var(--t-small);max-width:62ch;line-height:1.6;text-wrap:pretty}
-.sec-head .kicker{
-  display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--hue);margin-bottom:8px;
-}
-
 /* --- simulator gallery -----------------------------------------------------
    Not five identical rows. The grid is asymmetric: the first unit takes a wide
    tile, the rest pair off, and the fifth takes a wide tile again — so the eye
@@ -1290,14 +1383,13 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 .simtile:hover::after{opacity:1}
 .simtile .tile-top{display:flex;align-items:flex-start;gap:13px;margin-bottom:12px}
 .simtile .id{
-  font-family:var(--mono);font-size:13px;font-weight:700;color:var(--card-hue,var(--hue));
-  letter-spacing:-.01em;display:grid;place-items:center;flex:0 0 auto;
-  width:38px;height:38px;border-radius:var(--r-sm);
-  background:color-mix(in srgb,var(--card-hue,var(--hue)) 13%, transparent);
-  border:1px solid color-mix(in srgb,var(--card-hue,var(--hue)) 30%, transparent);
-  box-shadow:inset 0 0 14px -6px color-mix(in srgb,var(--card-hue,var(--hue)) 80%, transparent);
+  font-family:var(--mono);font-size:12px;font-weight:600;color:var(--card-hue,var(--hue));
+  letter-spacing:.02em;flex:0 0 auto;padding-top:7px;font-variant-numeric:tabular-nums;
 }
-.simtile h3{margin:1px 0 4px;font-size:var(--t-h3);font-weight:600;letter-spacing:-.018em;color:var(--ink)}
+.simtile h3{
+  margin:0 0 3px;font-family:var(--serif);font-size:23px;font-weight:500;
+  letter-spacing:-.012em;line-height:1.15;color:var(--ink);
+}
 /* Everything on a tile is set a step brighter and a step heavier than the same
    thing would be on a plain panel, and carries a shadow of the card's own
    ground. Type that reads as quiet and secondary against a flat surface reads
@@ -1305,8 +1397,8 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
    frequency small type is made of, and the contrast that was deliberate stops
    looking deliberate. */
 .simtile .cat{
-  font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;
-  color:var(--ink-dim);font-weight:600;
+  font-family:var(--serif);font-style:italic;font-size:15px;font-weight:400;
+  color:var(--ink-dim);letter-spacing:0;
   transition:color var(--dur-2) var(--ease);
 }
 .simtile small{
@@ -1315,28 +1407,14 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   transition:color var(--dur-2) var(--ease);
 }
 .simtile:hover .cat,.simtile:hover small{color:var(--ink)}
-/* What the unit actually contains, in the space the tile was leaving empty.
-   Every one of these is a count the verification harness checks against the
-   module itself, which is the only reason they are allowed on the page. */
-.simtile .tile-meta{
-  display:flex;flex-wrap:wrap;gap:5px 7px;margin-top:12px;
+/* What the unit contains, as a sentence. Every figure in it is a count the
+   verification harness checks against the module itself. */
+.simtile .tile-facts{
+  margin:10px 0 0;font-size:var(--t-small);line-height:1.5;color:var(--ink-faint);
+  font-variant-numeric:tabular-nums;max-width:60ch;
+  transition:color var(--dur-2) var(--ease);
 }
-.tmeta{
-  display:inline-flex;align-items:baseline;gap:5px;padding:3px 8px;border-radius:var(--r-xs);
-  background:color-mix(in srgb,var(--card-hue,var(--hue)) 8%, transparent);
-  border:1px solid color-mix(in srgb,var(--card-hue,var(--hue)) 18%, transparent);
-  transition:border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
-}
-.simtile:hover .tmeta{
-  background:color-mix(in srgb,var(--card-hue,var(--hue)) 13%, transparent);
-  border-color:color-mix(in srgb,var(--card-hue,var(--hue)) 30%, transparent);
-}
-.tmeta b{
-  font-family:var(--mono);font-size:12px;font-weight:600;color:var(--card-hue,var(--hue));
-  letter-spacing:-.02em;font-variant-numeric:tabular-nums;
-}
-.tmeta span{font-family:var(--mono);font-size:8.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
-
+.simtile:hover .tile-facts{color:var(--ink-dim)}
 .simtile .tile-foot{
   margin-top:auto;padding-top:14px;display:flex;align-items:center;gap:10px;
 }
@@ -1354,14 +1432,6 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   opacity:.88;transition:opacity var(--dur-2) var(--ease);
 }
 .simtile:hover .launch{opacity:1}
-.simtile .launch svg{
-  width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
-  /* The arrow moves on a transform rather than on the row's gap: a gap that
-     animates relays out the footer on every frame of the hover, a transform
-     does not touch layout at all. */
-  transition:transform var(--dur-2) var(--ease-out);
-}
-.simtile:hover .launch svg{transform:translateX(3px)}
 .simtile[data-state=planned]{opacity:.6;--card-hue:var(--ink-ghost)}
 .simtile[data-state=planned]:hover{transform:none;box-shadow:var(--sh-1),var(--edge)}
 
@@ -1525,8 +1595,6 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   .hero h1{max-width:none}
 }
 @media (max-width:680px){
-  .herostats{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:4px}
-  .herostats div:nth-child(2){border-right:0;margin-right:0;padding-right:0}
   .heroplant{max-height:190px}
 }
 
@@ -1543,13 +1611,9 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   background:var(--surface);padding:20px 18px;
   transition:background var(--dur-2) var(--ease);
 }
-.cap:hover{background:var(--bg-2)}
-.cap .cap-i{
-  width:30px;height:30px;border-radius:var(--r-sm);display:grid;place-items:center;margin-bottom:12px;
-  background:var(--hue-wash);border:1px solid color-mix(in srgb,var(--hue) 26%,transparent);color:var(--hue);
-}
-.cap .cap-i svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.cap h4{margin:0 0 6px;font-size:var(--t-body);font-weight:600;letter-spacing:-.012em}
+/* No hover on these: they are notes to be read, not things to be pressed, and
+   a cell that lights up under the pointer promises an action it does not have. */
+.cap h4{margin:0 0 8px;font-family:var(--serif);font-size:20px;font-weight:500;letter-spacing:-.01em;line-height:1.2}
 .cap p{margin:0;font-size:var(--t-small);color:var(--ink-faint);line-height:1.6}
 
 /* --- footer ---------------------------------------------------------------- */
@@ -1560,8 +1624,8 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 .sitefoot .foot-brand b{display:block;font-size:var(--t-h3);letter-spacing:-.018em;margin-bottom:5px}
 .sitefoot .foot-brand p{margin:0;color:var(--ink-faint);font-size:var(--t-small);line-height:1.6;max-width:38ch}
 .sitefoot h5{
-  margin:0 0 11px;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--ink-ghost);font-weight:500;
+  margin:0 0 11px;font-family:var(--serif);font-style:italic;font-size:16px;font-weight:400;
+  color:var(--ink-faint);letter-spacing:0;
 }
 .sitefoot ul{list-style:none;margin:0;padding:0;display:grid;gap:7px}
 .sitefoot li a,.sitefoot li span{font-size:var(--t-small);color:var(--ink-faint);transition:color var(--dur-1) var(--ease)}
@@ -1683,6 +1747,9 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
      the status note stay, because neither is reachable any other way. */
   .runbar .btn.primary{display:none}
   .runbar{position:static;padding-bottom:0}
+  /* The camera row stops short of the floating Run button instead of
+     scrolling underneath it, where the last positions could not be reached. */
+  .canvas-presets{right:100px}
 
   .home{padding:0 16px}
   .hero{padding:44px 0 40px}
@@ -1767,28 +1834,34 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   .kv .k{font-size:13px}
   .kv .v{font-size:15px}
   .hero h1{max-width:none}
-  .herostats div{padding-right:18px;margin-right:18px;flex:1 1 40%}
-  .herostats b{font-size:20px}
   .simgrid{grid-template-columns:1fr;gap:11px}
   .simtile,.simtile:nth-child(1){grid-column:span 1;min-height:0}
-  .simtile .preview,.simtile:nth-child(1) .preview{
-    width:150px;height:92px;right:-14px;bottom:-12px;opacity:.26;
+  /* On a phone the tile is a card with its plant on top, not a plant behind
+     its text. At a third of the desktop width the text runs right across the
+     middle of the frame, so a photograph under it can only ever be dimmed to
+     the point of not being there — and with no hover on a touch screen it
+     never gets brighter. As a band above the text it can be shown at full
+     strength, running where motion is allowed, and the text sits on the
+     card's own ground where it needs no scrim at all. */
+  .simtile,.simtile:nth-child(1){padding:0 16px 15px;text-shadow:none}
+  .simtile .tile-photo{
+    position:relative;inset:auto;flex:0 0 auto;height:clamp(132px,40vw,176px);
+    margin:0 -16px 14px;border-radius:var(--r-lg) var(--r-lg) 0 0;
+    border-bottom:1px solid var(--line-soft);
   }
-  .simtile small{display:none}
-  /* The photograph comes down a step on a phone rather than being scaled down
-     with everything else. A tile here is a third of the width it was and the
-     text sits right across the middle of the frame, so the same strength that
-     reads as atmosphere on a desktop reads as interference. The scrim comes up
-     to meet it, and the crop moves towards the middle because there is no
-     longer a text column on the left to keep clear. */
-  .simtile{--photo:.13;--photo-hi:.13}
+  .simtile{--photo:.94;--photo-hi:.94;--live:1;--live-hi:1}
+  .simtile .tile-photo::before{display:none}
   .simtile .tile-photo::after{
     background:
-      linear-gradient(101deg, var(--tile-scrim) 6%, var(--tile-scrim-soft) 58%, transparent 92%),
-      linear-gradient(0deg, var(--tile-scrim) 0%, transparent 52%),
-      radial-gradient(140% 130% at 60% 40%, transparent 30%, var(--tile-vignette) 100%);
+      linear-gradient(0deg, color-mix(in srgb,var(--surface) 70%,transparent) 0%, transparent 38%),
+      radial-gradient(140% 130% at 50% 45%, transparent 55%, var(--tile-vignette) 100%);
   }
-  .simtile .tile-photo-img{--photo-pos:50% 54%!important}
+  .simtile .preview,.simtile:nth-child(1) .preview{display:none}
+  .simtile .tile-photo-img{--photo-pos:50% 56%!important}
+  .simtile .tile-top{margin-bottom:8px}
+  .simtile h3{font-size:21px}
+  .simtile .tile-facts{margin-top:6px}
+  .simtile .launch{opacity:1}
   .signature{padding:34px 0 40px}
   .legend{left:8px;bottom:6px;font-size:8.5px;gap:8px;padding:4px 8px}
   .canvas-toolbar{top:8px;right:8px;left:auto}
@@ -1808,9 +1881,21 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   .canvas-toolbar .cmode-pills::-webkit-scrollbar{height:0}
   .canvas-toolbar .cmode-pills .btn{flex:0 0 auto}
   .hud{left:8px;top:8px;width:min(200px,calc(100% - 16px));padding:8px 9px}
+
+  /* The masthead has to hold the mark, the name, both destinations and the
+     theme switch in 375 px without any of them being cut off at the edge. */
+  .topbar{gap:8px;padding:0 12px}
+  .brand{gap:8px}
+  .topbar nav a{padding:6px 9px;font-size:13.5px}
+
+  /* The plate keeps its drawing furniture but gives the headline the room. */
+  .plate-chart{left:22px;width:auto}
+  .hero.plate h1{font-size:clamp(34px,10.2vw,44px);margin-bottom:18px}
+  .hero.plate .lede{font-size:16px;line-height:1.58;margin-bottom:24px}
+  .hero.plate .cta{flex-direction:column;align-items:stretch}
+  .hero.plate .cta .btn{justify-content:center;min-height:46px}
 }
 @media (max-width:400px){
-  .herostats div:nth-child(n+3){display:none}
   .hero .cta .btn{flex:1 1 100%;justify-content:center}
 }
 
@@ -2032,14 +2117,23 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 .xd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:18px 20px 14px;border-bottom:1px solid var(--line-soft)}
 .xd-head h2{margin:0 0 4px;font-size:var(--t-h3);font-weight:650;color:var(--ink);letter-spacing:-.01em}
 .xd-head p{margin:0;font-size:var(--t-small);color:var(--ink-faint);line-height:1.45}
-.xd-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;padding:18px 20px;min-height:0;overflow:auto}
-
-/* The preview is the sheet itself at a third of its size, so it keeps the
-   sheet's own proportions and never stretches. */
-.xd-preview{
-  position:relative;align-self:start;border-radius:var(--r);overflow:hidden;
-  background:var(--bg-2);border:1px solid var(--line);aspect-ratio:4 / 3;
+.xd-body{
+  display:grid;grid-template-columns:minmax(0,1fr) 332px;gap:20px;padding:18px 20px;
+  flex:1 1 auto;min-height:0;overflow:hidden;
 }
+
+/* The preview is the real output at a third of its size: the page being
+   looked at, the pages it comes with, and what the file will be. It scrolls
+   on its own, so the choices beside it stay where they are. */
+.xd-stage{display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0;overflow:auto;padding:1px}
+.xd-preview{
+  position:relative;flex:0 0 auto;border-radius:var(--r);overflow:hidden;
+  background:var(--bg-2);border:1px solid var(--line);aspect-ratio:var(--ar,4 / 3);
+  box-shadow:var(--sh-2);
+}
+/* A PNG with its tables under it is a tall image; it is read by scrolling
+   inside the frame rather than shrunk to a strip. */
+.xd-preview[data-tall="true"]{aspect-ratio:auto;max-height:min(62vh,640px);overflow-y:auto;overscroll-behavior:contain}
 .xd-canvas{display:block;width:100%;height:auto;transition:opacity var(--dur-2) var(--ease)}
 .xd-preview[data-busy="true"] .xd-canvas{opacity:.45}
 .xd-busy{
@@ -2049,19 +2143,46 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 }
 .xd-preview[data-busy="true"] .xd-busy{opacity:1}
 
-.xd-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.xd-pages{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 4px;scroll-snap-type:x proximity}
+.xd-pages:empty{display:none}
+.xd-page{
+  flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:5px;
+  border:1px solid var(--line);border-radius:var(--r-sm);background:var(--bg-1);cursor:pointer;
+  color:var(--ink-faint);font:inherit;font-size:var(--t-fine);scroll-snap-align:start;
+  transition:border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.xd-page canvas{display:block;width:108px;height:auto;border-radius:3px;background:var(--bg-2)}
+.xd-page:hover{border-color:var(--line-strong);color:var(--ink-dim)}
+.xd-page[aria-pressed="true"]{border-color:var(--hue);color:var(--ink);background:var(--hue-wash)}
+.xd-page:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* What the file will be, stated before it is made. */
+.xd-spec{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin:0;
+  border:1px solid var(--line-soft);border-radius:var(--r-sm);overflow:hidden;background:var(--line-soft);
+}
+.xd-spec > div{background:var(--bg-1);padding:9px 12px;min-width:0}
+.xd-spec dt{font-size:var(--t-fine);color:var(--ink-ghost);margin:0 0 2px}
+.xd-spec dd{margin:0;font-size:var(--t-small);color:var(--ink);font-weight:550;line-height:1.35;font-variant-numeric:tabular-nums}
+
+.xd-side{display:flex;flex-direction:column;gap:16px;min-width:0;min-height:0;overflow:auto;padding:1px 6px 6px 1px;overscroll-behavior:contain}
 .xd-set{margin:0;padding:0;border:0;min-width:0}
 .xd-set legend{
   padding:0 0 7px;font-family:var(--mono);font-size:var(--t-micro);letter-spacing:.12em;
   text-transform:uppercase;color:var(--ink-ghost);font-weight:600;
 }
-.xd-parts{display:flex;flex-direction:column;gap:3px;max-height:260px;overflow:auto;padding-right:2px}
-.xd-sizes{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+/* Only the size that applies to the chosen format is offered. */
+.xd[data-format="png"] .xd-set[data-for="pdf"],
+.xd[data-format="pdf"] .xd-set[data-for="png"]{display:none}
+.xd-parts{display:flex;flex-direction:column;gap:3px;max-height:230px;overflow:auto;padding-right:2px}
+.xd-grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.xd-grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .xd-opt{
   display:flex;align-items:flex-start;gap:9px;padding:7px 9px;border-radius:var(--r-sm);cursor:pointer;
-  border:1px solid transparent;
+  border:1px solid transparent;min-width:0;
   transition:background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
+.xd-grid2 .xd-opt,.xd-grid3 .xd-opt{border-color:var(--line-soft);background:var(--bg-1)}
 .xd-opt:hover{background:var(--bg-2)}
 .xd-opt:has(input:checked){background:var(--hue-wash);border-color:color-mix(in srgb,var(--hue) 34%,transparent)}
 .xd-opt:has(input[type=checkbox]:checked){background:transparent;border-color:transparent}
@@ -2070,23 +2191,61 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
 .xd-opt input{margin:2px 0 0;accent-color:var(--hue);flex:0 0 auto}
 .xd-opt span{display:flex;flex-direction:column;gap:1px;min-width:0}
 .xd-opt b{font-size:var(--t-small);font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.xd-opt small{font-size:var(--t-fine);color:var(--ink-faint)}
+.xd-opt small{font-size:var(--t-fine);color:var(--ink-faint);line-height:1.35}
 .xd-opt:focus-within{outline:2px solid var(--accent);outline-offset:1px}
+.xd-hint{margin:6px 2px 0;font-size:var(--t-fine);color:var(--ink-ghost);line-height:1.4}
 
-.xd-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 20px;border-top:1px solid var(--line-soft);background:var(--bg-1)}
-.xd-note{font-size:var(--t-fine);color:var(--ink-faint);line-height:1.4}
+.xd-field{display:flex;flex-direction:column;gap:5px;margin:0 0 11px}
+.xd-field:last-child{margin-bottom:0}
+.xd-field-l{font-size:var(--t-fine);font-weight:600;color:var(--ink-dim)}
+.xd-field small{font-size:var(--t-fine);color:var(--ink-ghost);line-height:1.4}
+.xd-field input,.xd-field textarea{
+  width:100%;padding:8px 11px;background:var(--bg-2);color:var(--ink);
+  border:1px solid var(--line);border-radius:var(--r-sm);
+  font-family:var(--font);font-size:var(--t-small);line-height:1.45;
+  transition:border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.xd-field textarea{resize:vertical;min-height:84px;max-height:220px}
+.xd-field input::placeholder,.xd-field textarea::placeholder{color:var(--ink-ghost)}
+.xd-field input:hover,.xd-field textarea:hover{border-color:var(--line-strong)}
+.xd-field input:focus,.xd-field textarea:focus{outline:none;border-color:var(--accent);box-shadow:var(--sh-glow)}
 
-/* On a phone the dialog is the screen: preview on top, choices under it, the
-   actions pinned to the foot where a thumb is. */
+.xd-foot{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 20px;
+  border-top:1px solid var(--line-soft);background:var(--bg-1);
+}
+.xd-note{font-size:var(--t-fine);color:var(--ink-faint);line-height:1.4;min-width:0;overflow-wrap:anywhere}
+.xd-foot .btnrow{flex:0 0 auto}
+
+@media (max-width:980px){
+  .xd-body{grid-template-columns:minmax(0,1fr) 300px}
+  .xd-spec{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* On a phone the dialog is the screen: one scroll, the preview first, the
+   choices under it, the actions pinned to the foot where a thumb is. Fields
+   are 16px so the browser does not zoom the page when one is focused. */
 @media (max-width:760px){
   .xd-backdrop{padding:0;place-items:end stretch}
-  .xd{width:100%;max-height:92dvh;border-radius:var(--r-xl) var(--r-xl) 0 0}
-  .xd-body{grid-template-columns:1fr;padding:14px}
+  .xd{width:100%;height:100dvh;max-height:100dvh;border-radius:0;border:0;animation-name:sheet-up}
+  .xd-head{padding:calc(12px + env(safe-area-inset-top,0px)) 14px 10px}
+  .xd-head p{display:none}
+  .xd-body{display:block;overflow:auto;padding:12px 14px 18px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  .xd-stage{overflow:visible;margin-bottom:18px}
+  .xd-side{overflow:visible;padding:0}
+  .xd-preview[data-tall="true"]{max-height:52vh}
+  .xd-page canvas{width:78px}
+  .xd-note{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .xd-parts{max-height:none}
-  .xd-foot{flex-direction:column;align-items:stretch}
-  .xd-foot .btnrow{justify-content:flex-end}
+  .xd-grid3{grid-template-columns:1fr}
+  .xd-opt{padding:10px 11px;min-height:44px}
+  .xd-field input,.xd-field textarea{font-size:16px;padding:10px 12px}
+  .xd-foot{flex-direction:column;align-items:stretch;gap:8px;padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px))}
+  .xd-foot .btnrow{display:grid;grid-template-columns:1fr 2fr;gap:8px}
+  .xd-foot .btn{justify-content:center;min-height:46px}
   .panel > header .xd-open span{display:none}
 }
+@keyframes sheet-up{from{transform:translateY(24px);opacity:0}}
 
 /* ===========================================================================
    REDUCED MOTION
@@ -2118,12 +2277,15 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   /* Arrivals fade in where they will sit, instead of travelling there. */
   @keyframes fade-up{from{opacity:0}to{opacity:1}}
   @keyframes rise{from{opacity:0}to{opacity:1}}
+  @keyframes sheet-up{from{opacity:0}to{opacity:1}}
   @keyframes tick-in{from{opacity:0}to{opacity:1}}
   @keyframes ws-in{from{opacity:0}to{opacity:1}}
   @keyframes pane-fwd{from{opacity:0}to{opacity:1}}
   @keyframes pane-back{from{opacity:0}to{opacity:1}}
   @keyframes dot-in{from{opacity:0}to{opacity:1}}
   @keyframes status-land{from{opacity:.4}to{opacity:1}}
+  /* The chart on the overview appears rather than being drawn line by line. */
+  @keyframes engrave{from{opacity:0}}
 
   /* Indicators arrive at their new place without sliding there. */
   .seg::before,.tabbar::before,.topbar nav::before,.topbar nav::after{
@@ -2135,7 +2297,7 @@ select.casesel:disabled{color:var(--ink-ghost);cursor:default}
   /* Hover lifts and zooms go; the colour and border change still say it. */
   .iconbtn:hover,.iconbtn:active,.btn:hover,.btn:active,.kpi:hover,
   .canvas-presets .cam:hover,.canvas-presets .cam:active,
-  .simtile:hover,.simtile:hover .launch svg,
+  .simtile:hover,
   .simtile:hover .tile-photo-img[data-ready="true"]{transform:none}
   .field input[type=range]:hover::-webkit-slider-thumb{transform:none}
 

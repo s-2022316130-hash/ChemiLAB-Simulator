@@ -22,10 +22,13 @@ import logoMark from '../../assets/chemilab-logo.svg?raw';
  * numbers came from.
  *
  * All dimensions are at the standard size (2400 × 1800) and multiplied by
- * `scale`, so a preview and a high-resolution export are the same drawing.
+ * `scale`, so a preview and a high-resolution export are the same drawing. A
+ * sheet made for paper takes the paper's proportions instead: the height stays
+ * 1800 and the width follows, so the picture and the lower band widen with it
+ * and the page is filled edge to edge rather than letterboxed.
  */
 
-const W = 2400, H = 1800, M = 56;
+const W0 = 2400, H = 1800, M = 56;
 const GUT = 340, GAP = 22;                 // callout gutters either side of the picture
 export const IMAGE_ASPECT = 1.9;           // at or above the renderer's reference, so framing is exact
 
@@ -50,9 +53,83 @@ const loadImage = src => new Promise((ok, fail) => {
 /** Room round the diagram: some captions sit just past its declared edge. */
 export const SVG_PAD = { x: 24, top: 18, bottom: 46 };
 
-function resolvedSvg(svg, spec, width, height) {
+/**
+ * The colours a sheet is drawn in.
+ *
+ * `match` is the app as it is on screen: the theme in force, the simulator's
+ * own hue. `white` is the light theme's palette whatever the screen is showing,
+ * for a sheet that is going to be printed — read from a hidden element that
+ * carries the light theme and this simulator, so the stylesheet assigns it the
+ * same tokens it would assign the page, rather than a second palette being
+ * kept here. Two tokens are aliases declared once on the root (`--accent` is
+ * `var(--hue)`); a custom property inherits its root value already resolved,
+ * so the probe declares the aliases again for them to follow its own hue.
+ * The one token it overrides is the ground, which on paper is white.
+ *
+ * The probe stays in the document until the sheet is finished with it —
+ * computed style is live, and reads nothing once the element has gone.
+ */
+export function sheetPalette(paper = 'match', simId = '') {
+  let probe = null, css;
+  if (paper === 'white') {
+    probe = document.createElement('i');
+    probe.style.cssText = 'position:absolute;width:0;height:0;visibility:hidden;pointer-events:none';
+    probe.style.setProperty('--accent', 'var(--hue)');
+    probe.style.setProperty('--accent-deep', 'var(--hue-deep)');
+    // The light theme's page is a pale blue-grey, chosen for a screen. On
+    // paper the ground is the paper: white, with the panels ruled on it.
+    probe.style.setProperty('--bg-0', '#ffffff');
+    probe.dataset.theme = 'light';
+    if (simId) probe.dataset.sim = simId;
+    document.body.appendChild(probe);
+    css = getComputedStyle(probe);
+  } else {
+    css = getComputedStyle(document.documentElement);
+  }
+  const cache = new Map();
+  const col = (name, fb = '#888888') => {
+    if (!cache.has(name)) cache.set(name, css.getPropertyValue(name).trim() || fb);
+    return cache.get(name);
+  };
+
+  // A token as an opaque #rrggbb, composited over the sheet's ground. The PDF
+  // writer takes plain RGB; a translucent rule or a `color-mix()` has to
+  // become the colour it actually looks like on the paper first.
+  const px = document.createElement('canvas');
+  px.width = px.height = 1;
+  const pctx = px.getContext('2d', { willReadFrequently: true });
+  const normal = document.createElement('i');
+  const solid = (name, over = col('--bg-0', '#000000')) => {
+    const key = `solid|${name}|${over}`;
+    if (cache.has(key)) return cache.get(key);
+    const v = name.startsWith('--') ? col(name) : name;
+    // Through a computed style first, which turns any colour syntax the page
+    // understands into one a canvas does.
+    normal.style.color = '';
+    normal.style.color = v;
+    (probe || document.body).appendChild(normal);
+    const c = getComputedStyle(normal).color || v;
+    normal.remove();
+    pctx.globalCompositeOperation = 'copy';
+    pctx.fillStyle = over; pctx.fillRect(0, 0, 1, 1);
+    pctx.globalCompositeOperation = 'source-over';
+    pctx.fillStyle = c; pctx.fillRect(0, 0, 1, 1);
+    const [r, g, b] = pctx.getImageData(0, 0, 1, 1).data;
+    const hex = `#${[r, g, b].map(n => n.toString(16).padStart(2, '0')).join('')}`;
+    cache.set(key, hex);
+    return hex;
+  };
+
+  return {
+    paper, css, col, solid,
+    font: col('--font', 'system-ui, sans-serif'),
+    mono: col('--mono', 'ui-monospace, monospace'),
+    dispose() { probe?.remove(); probe = null; }
+  };
+}
+
+function resolvedSvg(svg, spec, width, height, css = getComputedStyle(document.documentElement)) {
   const clone = svg.cloneNode(true);
-  const css = getComputedStyle(document.documentElement);
   const sub = s => s.replace(/var\((--[a-z0-9-]+)\s*(?:,\s*([^)]+))?\)/gi,
     (_, name, fb) => css.getPropertyValue(name).trim() || (fb || '').trim() || 'none');
   const walk = node => {
@@ -120,19 +197,26 @@ function place(items, top, bottom, gap) {
  * state      the store's state at the time of export
  * options    { callouts, readings, schematic, legend }
  * mode       the active colour mode, or null
+ * palette    from sheetPalette(); the app's own colours if left out
+ * aspect     width over height, for a sheet made to fit a paper size
+ * info       { title, preparedBy, notes } — what the person exporting added
  */
-export async function composeSheet({ sim, name, view, flowsheet, part, state, options, mode, scale = 1 }) {
+export async function composeSheet({ sim, name, view, flowsheet, part, state, options, mode, scale = 1, palette = null, aspect = 0, info = {} }) {
   const s = scale;
   const px = v => Math.round(v * s);
+  const W = aspect > 0 ? Math.round(H * aspect) : W0;
   const canvas = document.createElement('canvas');
   canvas.width = px(W); canvas.height = px(H);
   const ctx = canvas.getContext('2d');
 
-  const col = n => token(n, '#888');
-  const font = token('--font', 'system-ui, sans-serif');
-  const mono = token('--mono', 'ui-monospace, monospace');
+  const pal = palette || { col: n => token(n, '#888'), css: getComputedStyle(document.documentElement), font: token('--font', 'system-ui, sans-serif'), mono: token('--mono', 'ui-monospace, monospace') };
+  const col = n => pal.col(n, '#888');
+  const font = pal.font, mono = pal.mono;
   const f = (size, weight = 400, face = font) => `${weight} ${px(size)}px ${face}`;
   const hue = col('--hue');
+  const title = info.title?.trim() || name;
+  const preparedBy = info.preparedBy?.trim() || '';
+  const notes = info.notes?.trim() || '';
 
   const usable = state.status === Status.COMPLETE || state.status === Status.WARNING;
   const eq = usable ? sim.engine.getEquipmentState(state.result) : {};
@@ -152,10 +236,13 @@ export async function composeSheet({ sim, name, view, flowsheet, part, state, op
   ctx.fillText('CHEMILAB SIMULATOR  ·  PLANT SHEET', px(M + 108), px(M + 26));
   ctx.fillStyle = col('--ink');
   ctx.font = f(44, 700);
-  ctx.fillText(fit(ctx, name, px(1150)), px(M + 106), px(M + 76));
+  const titleMax = W - M - 1000 - 32 - (M + 106);
+  ctx.fillText(fit(ctx, title, px(titleMax)), px(M + 106), px(M + 76));
   ctx.fillStyle = hue;
   ctx.font = f(22, 600, mono);
-  ctx.fillText(part.label.toUpperCase(), px(M + 108), px(M + 108));
+  // A sheet given its own title still says which plant it is.
+  const subject = title === name ? part.label.toUpperCase() : `${name.toUpperCase()}  ·  ${part.label.toUpperCase()}`;
+  ctx.fillText(fit(ctx, subject, px(titleMax)), px(M + 108), px(M + 108));
 
   const modeName = sim.scenarios?.modes?.find(m => m.id === state.scenario)?.name || state.scenario || 'Base case';
   const faultNames = (state.faults || []).map(id => sim.scenarios?.faults?.find(x => x.id === id)?.name || id);
@@ -166,19 +253,23 @@ export async function composeSheet({ sim, name, view, flowsheet, part, state, op
     ['Case', modeName],
     ['Faults', faultNames.length ? faultNames.join(', ') : 'None'],
     ['Detail', (state.level || 'student').replace(/^./, c => c.toUpperCase())],
-    ['Generated', new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })]
+    ['Generated', new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })],
+    ['Model', `v${sim.engine.modelVersion}`]
   ];
-  const mx = px(W - M - 560);
-  ctx.font = f(16, 600, mono);
+  if (preparedBy) meta.splice(4, 0, ['Prepared by', preparedBy]);
+  // Two columns of three, like the fields of a drawing's title block; the
+  // status badge sits under the second.
+  const mx0 = W - M - 1000, colW = 500, kw = 150;
   meta.forEach(([k, v], i) => {
-    const y = px(M + 22 + i * 26);
+    const mx = px(mx0 + Math.floor(i / 3) * colW), y = px(M + 22 + (i % 3) * 26);
     ctx.fillStyle = col('--ink-ghost');
+    ctx.font = f(16, 600, mono);
     ctx.fillText(k.toUpperCase(), mx, y);
     ctx.fillStyle = col('--ink-dim');
     ctx.font = f(18, 500);
-    ctx.fillText(fit(ctx, v, px(420)), mx + px(140), y);
-    ctx.font = f(16, 600, mono);
+    ctx.fillText(fit(ctx, v, px(colW - kw - 24)), mx + px(kw), y);
   });
+  ctx.font = f(16, 600, mono);
   // Run status, as a badge, so it is the first thing read in the corner.
   ctx.font = f(16, 700, mono);
   const sw = ctx.measureText(statusText).width + px(28);
@@ -292,7 +383,8 @@ export async function composeSheet({ sim, name, view, flowsheet, part, state, op
 
   // --- lower band: schematic, then headline and legend -------------------------
   const ly = iy + ih + 44, lh = H - M - 70 - ly;
-  const sx = M, swid = 1480;
+  // The schematic takes the same share of a wider sheet as of the standard one.
+  const sx = M, swid = Math.round((W - 2 * M) * (1480 / (W0 - 2 * M)));
   const panel = (x, y, w, h, title) => {
     roundRect(ctx, px(x), px(y), px(w), px(h), px(12));
     ctx.fillStyle = col('--bg-1'); ctx.fill();
@@ -313,7 +405,7 @@ export async function composeSheet({ sim, name, view, flowsheet, part, state, op
     // Where spec coordinate (0, 0) lands on the sheet, for marking nodes.
     const ox = dx + SVG_PAD.x * k, oy = dy + SVG_PAD.top * k;
     try {
-      const img = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(resolvedSvg(flowsheet.svg, spec, px(dw), px(dh)))}`);
+      const img = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(resolvedSvg(flowsheet.svg, spec, px(dw), px(dh), pal.css))}`);
       ctx.drawImage(img, px(dx), px(dy), px(dw), px(dh));
       // The same part, marked on the schematic, so the picture above and the
       // diagram below are visibly about the same units.
@@ -333,8 +425,8 @@ export async function composeSheet({ sim, name, view, flowsheet, part, state, op
   }
 
   const rx = options.schematic ? sx + swid + 28 : M, rw = W - M - rx;
-  if (options.legend || usable) {
-    panel(rx, ly, rw, lh, 'HEADLINE AND LEGEND');
+  if (options.legend || usable || notes) {
+    panel(rx, ly, rw, lh, notes && !options.legend && !usable ? 'NOTES' : 'HEADLINE AND LEGEND');
     let y = ly + 74;
     // Headline readings — the run's own, or a plain statement that there is none.
     if (usable && state.result?.kpis?.length) {
@@ -389,6 +481,32 @@ export async function composeSheet({ sim, name, view, flowsheet, part, state, op
         ctx.fillStyle = rampNone(); ctx.fillRect(px(gx), px(gy + gh + 36), px(14), px(14));
         ctx.fillStyle = col('--ink-ghost'); ctx.font = f(14, 500);
         ctx.fillText('no reading for this unit', px(gx + 22), px(gy + gh + 48));
+        y = gy + gh + 72;
+      }
+    }
+
+    // The exporter's own notes, in whatever room the panel has left. Whatever
+    // does not fit ends in an ellipsis here and appears in full in the data
+    // appendix.
+    if (notes) {
+      const bottom = ly + lh - 24, lineH = 24;
+      const top = y + 8;
+      if (bottom - top >= 30 + lineH) {
+        ctx.fillStyle = col('--line'); ctx.fillRect(px(rx + 22), px(top), px(rw - 44), px(1));
+        ctx.fillStyle = col('--ink-faint'); ctx.font = f(15, 700, mono);
+        ctx.fillText('NOTES', px(rx + 22), px(top + 30));
+        ctx.fillStyle = col('--ink-dim'); ctx.font = f(17, 500);
+        const maxW = px(rw - 44), room = Math.floor((bottom - (top + 38)) / lineH);
+        const lines = [];
+        let line = '';
+        for (const w of notes.split(/\s+/)) {
+          const next = line ? `${line} ${w}` : w;
+          if (ctx.measureText(next).width > maxW && line) { lines.push(line); line = w; } else line = next;
+        }
+        if (line) lines.push(line);
+        const shown = lines.slice(0, room);
+        if (lines.length > room && shown.length) shown[shown.length - 1] = fit(ctx, `${shown[shown.length - 1]} …`, maxW);
+        shown.forEach((t, i) => ctx.fillText(fit(ctx, t, maxW), px(rx + 22), px(top + 38 + (i + 1) * lineH - 4)));
       }
     }
   }
