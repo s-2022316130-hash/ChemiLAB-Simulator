@@ -5,7 +5,7 @@ import { invalidateTokens } from '../shared/theme.js';
 import { icon } from '../shared/icons.js';
 import { previewNode } from './previews.js';
 import { backdropFor } from './backdrops.js';
-import { createHeroField } from './heroField.js';
+import { psychroChart } from './psychro.js';
 import { heroPlantNode } from './heroPlant.js';
 import { signature, AUTHOR } from '../shared/components/signature.js';
 import { reducedMotion } from '../shared/motion.js';
@@ -22,9 +22,10 @@ import { createLiveTiles } from './liveTiles.js';
 
 export function homePage(view, { section = null } = {}) {
   delete document.documentElement.dataset.sim;
+  // The overview has a ground of its own — see HOME in theme.css — and the
+  // workspace keeps the one it has always had.
+  document.documentElement.dataset.page = 'home';
   invalidateTokens();
-
-  const field = el('div', { class: 'hero-field' });
   const gallery = el('section', { class: 'simsec', id: 'library' });
   const how = el('section', { class: 'capsec', id: 'method' });
 
@@ -49,23 +50,23 @@ export function homePage(view, { section = null } = {}) {
   );
 
   const page = el('div', { class: 'home' }, [
-    el('section', { class: 'hero' }, [
-      field,
+    // The hero is a drawing plate: a sheet border with zone references and
+    // centring marks, an engraved psychrometric chart as its ground, the plant
+    // in elevation, and the facts in a title block. Every piece of it is
+    // drawing-office furniture that a drawing actually carries.
+    el('section', { class: 'hero plate' }, [
+      plateFrame(),
+      el('figure', { class: 'plate-chart' }, [
+        psychroChart(),
+        el('figcaption', { text: 'Psychrometric chart at 101.325 kPa' })
+      ]),
       el('div', { class: 'hero-copy' }, [
-        el('span', { class: 'eyebrow', text: 'Chemical engineering virtual plant' }),
-        el('h1', {}, [
-          document.createTextNode('Run the plant. Then find out '),
-          el('em', { text: 'why' }),
-          document.createTextNode(' it behaves that way.')
-        ]),
+        el('h1', { text: 'Run the plant. Then find out why it behaves that way.' }),
         el('p', { class: 'lede', text: 'Change an operating condition, solve the balances, and watch the same solved state appear in the 3D plant, the flowsheet, the results rail and the equations behind them. Not an animation of a process — a process model with a plant drawn on top of it.' }),
         el('div', { class: 'cta' }, [
           // A link to the library route rather than a scroll of its own, so the
           // masthead nav follows it and the address says where you are.
-          el('a', {
-            class: 'btn primary', href: href.simulators,
-            html: `Explore the simulators ${icon('arrow')}`
-          }),
+          el('a', { class: 'btn primary', href: href.simulators, text: 'Explore the simulators' }),
           el('button', {
             class: 'btn',
             html: `${icon('book')} How it works`,
@@ -74,11 +75,13 @@ export function homePage(view, { section = null } = {}) {
         ])
       ]),
       el('div', { class: 'hero-art' }, [heroPlantNode()]),
-      el('div', { class: 'herostats' }, [
-        stat(TOTALS.simulators, 'Process units'),
-        stat(TOTALS.units, 'Tagged equipment'),
-        stat(TOTALS.faults, 'Faults to diagnose'),
-        stat(TOTALS.tourSteps, 'Guided steps')
+      // The facts about the library, as a title block records a drawing’s:
+      // counted from the registry, each one a count of something that exists.
+      el('dl', { class: 'titleblock' }, [
+        cell('Process units', TOTALS.simulators),
+        cell('Tagged equipment', TOTALS.units),
+        cell('Faults to diagnose', TOTALS.faults),
+        cell('Guided tour steps', TOTALS.tourSteps)
       ])
     ]),
     gallery,
@@ -93,14 +96,13 @@ export function homePage(view, { section = null } = {}) {
   // from the top of a page that has only just appeared would be a second
   // transition stacked on the first.
   if (section === 'library') goTo(gallery, false);
-  const disposeField = createHeroField(field);
   // The five plants, running, in their own tiles. Loaded only as the library
   // nears the screen, so the overview itself stays as light as it was.
   const live = createLiveTiles(gallery.querySelector('.simgrid'), new Map(SIMULATORS.map(s => [s.id, s])));
   return {
     // Leaving the overview hands the preview renderer’s GPU context straight
     // back: the simulator being opened is about to want one.
-    dispose() { disposeField?.(); live.dispose(); },
+    dispose() { live.dispose(); delete document.documentElement.dataset.page; },
     // The overview and the library are one page, so moving between them is a
     // scroll to the right place rather than a rebuild of the same page.
     navigate(route) {
@@ -119,22 +121,35 @@ export function simulatorsPage(view) { return homePage(view, { section: 'library
 
 /* --- pieces ---------------------------------------------------------------- */
 
-/** One counted fact on a gallery tile. */
-function meta(value, label) {
-  return el('span', { class: 'tmeta' }, [
-    el('b', { text: String(value) }),
-    el('span', { text: label })
+/** One cell of the title block: what it records, then the figure. */
+function cell(label, value) {
+  return el('div', {}, [el('dt', { text: label }), el('dd', { text: String(value) })]);
+}
+
+/**
+ * The sheet border. Two rules with the zone references between them — columns
+ * 1 to 8 along the top and foot, rows A to D down the sides — and a centring
+ * mark at the middle of each edge, as a drawing sheet is laid out (ISO 5457).
+ * Decorative to a screen reader, so it is hidden from one.
+ */
+function plateFrame() {
+  const zones = (n, cls, label) => el('div', { class: `zones ${cls}` },
+    Array.from({ length: n }, (_, i) => el('span', { text: label(i) })));
+  const num = i => String(i + 1), row = i => 'ABCD'[i];
+  return el('div', { class: 'plate-frame', 'aria-hidden': 'true' }, [
+    zones(8, 'z-top', num), zones(8, 'z-bottom', num),
+    zones(4, 'z-left', row), zones(4, 'z-right', row),
+    el('i', { class: 'cmark cm-t' }), el('i', { class: 'cmark cm-b' }),
+    el('i', { class: 'cmark cm-l' }), el('i', { class: 'cmark cm-r' })
   ]);
 }
 
-function stat(value, label) {
-  return el('div', {}, [el('b', { text: String(value) }), el('span', { text: label })]);
-}
-
 function sectionHead(kicker, title, body) {
-  return el('div', { class: 'sec-head' }, [
+  // The kicker is no longer drawn: a tracked-capitals label over a heading
+  // that already says the same thing is noise. The argument stays so the call
+  // sites keep saying what each section is.
+  return el('div', { class: 'sec-head', dataset: { section: kicker } }, [
     el('div', {}, [
-      el('span', { class: 'kicker', text: kicker }),
       el('h2', { text: title }),
       el('p', { text: body })
     ])
@@ -188,41 +203,53 @@ function simTile(s, i) {
       el('span', { class: 'id', text: s.number }),
       el('div', {}, [
         el('h3', { text: s.name }),
-        el('span', { class: 'cat', text: s.category || '' })
+        el('span', { class: 'cat', text: discipline(s.category) })
       ])
     ]),
     el('small', { text: s.tagline }),
-    s.counts ? el('div', { class: 'tile-meta' }, [
-      meta(s.counts.units, 'tagged units'),
-      meta(s.counts.faults, 'faults'),
-      meta(s.counts.challenges, 'challenges'),
-      meta(s.counts.tourSteps, 'tour steps')
-    ]) : null,
+    // What the unit holds, said as a sentence rather than as four boxed chips.
+    // Every figure is one the verification harness checks against the module.
+    s.counts ? el('p', { class: 'tile-facts', text: facts(s.counts) }) : null,
+    // A state badge only where there is something to say: five units that are
+    // all operational do not each need a label announcing it.
     el('div', { class: 'tile-foot' }, [
-      el('span', { class: 'pill', text: STATE_LABEL[s.state] }),
-      ready ? el('span', { class: 'launch', html: `Launch simulator ${icon('arrow')}` }) : null
-    ].filter(Boolean))
+      ready ? el('span', { class: 'launch', text: 'Open the plant' })
+        : el('span', { class: 'pill', text: STATE_LABEL[s.state] })
+    ])
   ]);
 }
 
+/** "Separation · Physical chemistry" read as the phrase it is. */
+function discipline(category = '') {
+  return category.split(/\s*·\s*/).filter(Boolean)
+    .map((part, i) => (i ? part.charAt(0).toLowerCase() + part.slice(1) : part)).join(', ');
+}
+
+const facts = c =>
+  `${c.units} tagged units, ${c.faults} faults, ${c.challenges} graded challenges and ${c.tourSteps} tour steps`;
+
 const CAPABILITIES = [
-  { icon: 'cube', title: 'A plant you can walk around',
+  { title: 'A plant you can walk around',
     text: 'A three.js scene per unit, built from a shared industrial geometry library and lit by a reflection probe. Equipment is selectable, streams animate only where the engine reports flow, and quality is measured rather than assumed — a governor watches what a frame actually costs and holds the frame rate.' },
-  { icon: 'diagram', title: 'A flowsheet that is the same state',
+  { title: 'A flowsheet that is the same state',
     text: 'ISA-style symbols with live stream values, direction arrows and marching dashes on flowing lines. Selection is two-way with the 3D plant, so the two views are one process seen twice rather than two drawings kept in step by hand.' },
-  { icon: 'gauge', title: 'Balances that have to close',
+  { title: 'Balances that have to close',
     text: 'Fixed-point and bisection solvers that report convergence honestly. A run that does not meet its tolerance says so, and an invalid one clears the previous result rather than leaving stale numbers looking current.' },
-  { icon: 'alert', title: 'Six faults per unit, undiagnosed',
+  { title: 'Six faults per unit, undiagnosed',
     text: 'Each fault carries the symptoms a control room would actually see, in the order it would see them — and deliberately not the cause. Working that out from the instruments is the exercise.' },
-  { icon: 'layers', title: 'Every number carries its provenance',
+  { title: 'Every number carries its provenance',
     text: 'First-principles calculation, engineering correlation, educational approximation or reference value: each is declared in the model assumptions. Nothing on screen is filled in to make a panel look busy.' },
-  { icon: 'shield', title: 'Verified, not asserted',
+  { title: 'Verified, not asserted',
     text: 'A harness checks identity between engine, flowsheet and cards in both directions, the full contract, that no value leaks before a run, the neighbourhood of every base case, and twenty thousand random operating points per engine.' }
 ];
 
+/**
+ * One of the general notes. No icon: a cube beside "a plant you can walk
+ * around" says nothing the words do not, and six of them in a grid is
+ * decoration, not information.
+ */
 function capCard(c) {
   return el('div', { class: 'cap' }, [
-    el('div', { class: 'cap-i', html: icon(c.icon) }),
     el('h4', { text: c.title }),
     el('p', { text: c.text })
   ]);
@@ -257,6 +284,7 @@ function siteFooter() {
 export async function simulatorPage(view, id) {
   const entry = getSimulator(id);
   clear(view);
+  delete document.documentElement.dataset.page;
   // The signature hue is set on the root before anything mounts, because the 3D
   // renderer reads it at construction to tint its lighting and its sky.
   document.documentElement.dataset.sim = id || '';

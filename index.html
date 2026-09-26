@@ -18,9 +18,9 @@
     document.documentElement.style.colorScheme = t;
   } catch (e) { document.documentElement.dataset.theme = 'dark'; }
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<!-- Fonts are bundled (src/shared/fonts.css), not fetched from Google: that
+     request timed out on some networks and could never work offline. -->
+<link rel="stylesheet" href="./src/shared/fonts.css" />
 <link rel="stylesheet" href="./src/shared/theme.css" />
 </head>
 <body>
