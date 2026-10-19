@@ -139,6 +139,11 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
    * pans and pinches.
    */
   const FIT_SHARE = 0.35;
+  // Held upright the camera also looks down from higher up (lifted(), below),
+  // which turns the plot's depth into height on the screen and fills the frame
+  // the other way; standing back as far as before then left the plant a small
+  // object in the middle of a tall picture.
+  const FIT_SHARE_UPRIGHT = 0.18;
 
   const fitFactor = () => {
     const a = camera.aspect || REFERENCE_ASPECT;
@@ -146,14 +151,38 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
     const want = neededFov(a);
     const used = Math.min(Math.max(want, BASE_FOV), MAX_FOV);
     const full = tanHalf(want) / tanHalf(used);
-    return Math.min(2.6, 1 + (full - 1) * FIT_SHARE);
+    return Math.min(2.6, 1 + (full - 1) * (a < 1 ? FIT_SHARE_UPRIGHT : FIT_SHARE));
   };
-  /** A preset position pulled back to frame the same thing in this panel. */
+  /**
+   * Upright, look down from higher up.
+   *
+   * Standing back is enough to get a long plant across a phone held upright,
+   * and leaves it a band through the middle of the screen with nothing above or
+   * below it. From higher up, the depth of the plot becomes height on the
+   * screen: the same plant fills more of a tall frame, and units hidden behind
+   * the front row come into view. The lift grows as the panel gets narrower and
+   * never takes the camera past a steep three-quarter view — a plan view is a
+   * drawing, and the diagram is one tab away. Landscape panels are untouched.
+   */
+  const LIFT = 22 * Math.PI / 180, LIFT_CAP = 66 * Math.PI / 180;
+  function lifted(off) {
+    const a = camera.aspect || REFERENCE_ASPECT;
+    const horiz = Math.hypot(off.x, off.z);
+    if (a >= 1 || horiz < 1e-6) return off;
+    const len = off.length();
+    const el = Math.atan2(off.y, horiz);
+    const want = Math.min(el + LIFT * Math.min(1, (1 - a) / 0.5), LIFT_CAP);
+    if (want <= el) return off;
+    const s = Math.cos(want) * len / horiz;
+    return new THREE.Vector3(off.x * s, Math.sin(want) * len, off.z * s);
+  }
+
+  /** A preset position pulled back, and up on a tall panel, to frame the same thing in this panel. */
   function framed(pos, target) {
     const k = fitFactor();
-    if (k === 1) return new THREE.Vector3(...pos);
     const t = new THREE.Vector3(...target);
-    return t.clone().add(new THREE.Vector3(...pos).sub(t).multiplyScalar(k));
+    const off = lifted(new THREE.Vector3(...pos).sub(t));
+    return t.add(off.multiplyScalar(k));
   }
 
   const marker = selectionRing(hue); marker.visible = false; scene.add(marker);
@@ -221,6 +250,56 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   composer.addPass(new OutputPass());
 
   let usePost = true;
+
+  // --- shader warm-up ------------------------------------------------------
+  // three.js compiles a material's shader the first time something wearing it
+  // is drawn, and waits for the driver while it does. That is the plant's whole
+  // palette in its first frame — measured on a slowed phone, three seconds in
+  // which the page cannot be scrolled or tapped — and then again for each unit
+  // that first comes into view when the camera turns. So everything is compiled
+  // up front, off the main thread where the browser allows it, and the view
+  // starts drawing once it is ready. Units off the screen are included.
+  //
+  // The composer draws into a linear HDR target and a low-quality frame draws
+  // straight to the screen, and those are two different shaders for every
+  // material. The composer's set is compiled first because that is what the
+  // first frame uses; the screen's set follows once the plant is up, so a
+  // machine that drops to the low tier does not freeze on the way down.
+  let warm = 'pending';             // 'pending' | 'compiling' | 'ready'
+  function compileFor(target, subject = scene) {
+    renderer.setRenderTarget(target);
+    try { return renderer.compileAsync(subject, camera); }
+    finally { renderer.setRenderTarget(null); }
+  }
+  // The bloom pass draws its blur and composite with full-screen quads that
+  // are in no scene, so they would otherwise compile in the first frame. Laid
+  // out as a scene of their own they compile with everything else; they draw
+  // into render targets, so they are compiled for one.
+  const passScene = new THREE.Scene();
+  for (const m of [bloomPass.materialHighPassFilter, ...bloomPass.separableBlurMaterials,
+    bloomPass.compositeMaterial, bloomPass.blendMaterial].filter(Boolean)) {
+    passScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), m));
+  }
+  async function warmUp() {
+    warm = 'compiling';
+    container.dataset.warming = 'true';
+    try {
+      await Promise.all([
+        compileFor(composer.readBuffer), compileFor(composer.readBuffer, passScene),
+        compileFor(null, captionScene)
+      ]);
+    } catch { /* a shader that will not compile reports itself when it is drawn */ }
+    if (warm !== 'compiling') return;   // disposed while compiling
+    warm = 'ready';
+    delete container.dataset.warming;
+    // Creating that second set is a few hundred milliseconds of main-thread
+    // work on a phone, so it waits for a moment when the page is idle.
+    const whenIdle = window.requestIdleCallback || (fn => setTimeout(fn, 1));
+    setTimeout(() => whenIdle(() => {
+      if (warm !== 'ready') return;
+      try { compileFor(null).catch(() => {}); } catch { /* as above */ }
+    }, { timeout: 6000 }), 2500);
+  }
 
   // --- shadows -------------------------------------------------------------
   // The shadow map is re-rendered on demand rather than every frame. Nothing
@@ -378,10 +457,57 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
   const tickers = new Set();
   let shadowClock = 0;
 
-  const stopLoop = onFrame((dt, t) => {
+  // A phone at rest is drawn at half rate. Nothing on screen moves fast enough
+  // to need sixty frames a second unless someone is moving it — tracers creep,
+  // the idle orbit is a degree and a half a second — and on a phone every frame
+  // is battery and heat, and heat is what makes a phone slow itself down a
+  // minute later. A touch, a camera flight or a colour change restores the full
+  // rate at once. Time skipped is carried into the next frame drawn, so nothing
+  // animates slower; it animates in larger steps.
+  const REST_FRAME = 1 / 30;
+  let carried = 0;
+
+  /**
+   * Captions that would land on top of each other, on a phone.
+   *
+   * A whole plant in a phone's width puts thirty captions in a space that holds
+   * eight, and thirty overlapping plates are not thirty labels — they are one
+   * smudge. So, nearest first, a caption that would cover one already placed
+   * fades out instead, and comes back as the camera moves in and the plates
+   * separate. The selected unit's caption is always shown. A caption already
+   * showing is measured a little smaller than it is, so two plates that only
+   * just touch do not take turns flickering on and off as the camera drifts.
+   */
+  const shown = [];
+  const taken = [];
+  const onScreen = new THREE.Vector3();
+  function declutter(list, vw, vh) {
+    list.sort((a, b) => (b.sel - a.sel) || (a.d - b.d));
+    taken.length = 0;
+    for (const e of list) {
+      if (e.target <= 0.02) continue;
+      onScreen.copy(e.l.position).project(camera);
+      if (onScreen.z > 1) continue;
+      const x = (onScreen.x + 1) / 2 * vw, y = (1 - onScreen.y) / 2 * vh;
+      const s = 0.47 * (e.sel ? 1.25 : 1) * (e.l.material.opacity > 0.5 ? 0.86 : 1) / 2;
+      const hw = e.l.userData.pxW * s, hh = e.l.userData.pxH * s;
+      const r = [x - hw, y - hh, x + hw, y + hh];
+      if (!e.sel && taken.some(q => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1])) e.target = 0;
+      else taken.push(r);
+    }
+  }
+
+  const stopLoop = onFrame((frameDt, t) => {
     // A tab layout hides the 3D panel rather than unmounting it. Rendering a
     // view with no width costs a frame and shows nobody anything.
     if (container.clientWidth < 2 || container.clientHeight < 2) return;
+    if (warm !== 'ready') { if (warm === 'pending') warmUp(); return; }
+    carried += frameDt;
+    const resting = handheld && idle > 1.2 && !pressed && !flying && !tintGlide;
+    if (resting && carried < REST_FRAME - 0.002) return;
+    const dt = Math.min(carried, 0.1);
+    carried = 0;
+    const began = performance.now();
     controls.update();
 
     // Idle orbit: after eight seconds of stillness the camera drifts round the
@@ -414,11 +540,16 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
       // it either buries the small plant in text or empties the large one.
       const focus = camera.position.distanceTo(controls.target);
       const fadeStart = focus * 1.25, fadeEnd = focus * 2.1;
+      shown.length = 0;
       for (const l of labels.children) {
         if (l.userData.sig === 'empty') continue;
         const d = camera.position.distanceTo(l.position);
-        const sel = l.userData.selected;
+        const sel = !!l.userData.selected;
         const target = sel ? 1 : Math.max(0, Math.min(0.95, (fadeEnd - d) / (fadeEnd - fadeStart)));
+        shown.push({ l, d, sel, target });
+      }
+      if (handheld) declutter(shown, renderer.domElement.clientWidth || 1, vh);
+      for (const { l, d, sel, target } of shown) {
         l.material.opacity = damp(l.material.opacity, target, 9, dt);
         l.visible = l.material.opacity > 0.02;
         const k = pxToWorld * d * 0.47 * (sel ? 1.25 : 1);
@@ -471,6 +602,7 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
       renderer.render(captionScene, camera);
       renderer.autoClear = true;
     }
+    gov.sample(dt, performance.now() - began);
   });
 
   return {
@@ -754,12 +886,14 @@ export function createPlantView(container, { onSelect, onHover } = {}) {
     get tier() { return gov.tier; },
 
     dispose() {
+      warm = 'disposed';
       stopLoop(); offTier(); offTheme(); gov.dispose();
       removeEventListener('pointerup', onPointerUp);
       ro.disconnect(); controls.dispose();
       env.dispose();
       composer.renderTarget1.dispose(); composer.renderTarget2.dispose();
       bloomPass.dispose?.(); outlinePass.dispose?.();
+      passScene.traverse(o => o.geometry?.dispose());
       labels.traverse(o => { o.material?.map?.dispose(); o.material?.dispose?.(); });
       motes.geometry.dispose(); motes.material.dispose();
       renderer.dispose();

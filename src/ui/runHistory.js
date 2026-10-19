@@ -49,7 +49,7 @@ export function createRunHistory(sim, store, runtime) {
     if (!runs.length) {
       host.appendChild(el('p', {
         class: 'fallback',
-        text: 'Every run this session lands here. Click one to put its inputs back into the panel.'
+        text: 'Every run this session lands here. Choose one to put its inputs back into the panel.'
       }));
       return;
     }

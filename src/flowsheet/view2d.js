@@ -218,8 +218,13 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
     const { r, k, offX, offY } = frame();
     return { x: vb.x + (clientX - r.left - offX) / k, y: vb.y + (clientY - r.top - offY) / k };
   }
+  // Whether the reader has moved the view themselves. Until they have, the
+  // view is the one startView() chooses for the panel's size.
+  let handled = false;
+
   /** Zoom by `factor` about a point that must stay where it is on screen. */
   function zoomAt(clientX, clientY, factor) {
+    handled = true;
     const p = toUser(clientX, clientY);
     const w = Math.min(MAX_W, Math.max(MIN_W, vb.w / factor));
     const f = vb.w / w;
@@ -229,13 +234,48 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
     applyView();
     touched();
   }
-  function fit() { Object.assign(vb, home); applyView(); touched(); }
+  function fit() { handled = true; Object.assign(vb, home); applyView(); touched(); }
+
+  /**
+   * A legible start on a narrow screen.
+   *
+   * Fitted whole into a phone held upright, a diagram eleven hundred units wide
+   * is a strip a third of the screen high with its tags four pixels tall — all
+   * of it there and none of it readable. So a panel too narrow to show the
+   * drawing at a legible size opens on its left-hand end, where each of these
+   * plants takes its feed, at the size the tags were drawn to be read at and as
+   * tall as the panel allows, with the whole height of the diagram in view; the
+   * rest is a drag along the process away. Fit still shows everything. A panel
+   * that can already show the drawing legibly — a desktop, a tablet — is not
+   * touched, and once the reader has moved the view it is left where they put
+   * it, through a rotation as much as anything else.
+   */
+  const LEGIBLE = 0.8;   // screen px per diagram unit: 13.5-unit tags at about 11 px
+  function startView() {
+    if (handled) return;
+    const r = root.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return;
+    const fitK = Math.min(r.width / home.w, r.height / home.h);
+    const k = Math.min(LEGIBLE, r.height / home.h);
+    if (k <= fitK * 1.05) { Object.assign(vb, home); applyView(); return; }
+    vb.w = r.width / k;
+    vb.h = home.h * (vb.w / home.w);
+    vb.x = 0;
+    vb.y = (home.h - vb.h) / 2;
+    applyView();
+  }
+  // Built while its tab is hidden on a phone, so the first real size arrives
+  // when the panel is first shown.
+  const sizeWatch = new ResizeObserver(startView);
+  sizeWatch.observe(root);
 
   // A one-line hint over the diagram, gone the moment it has been acted on.
+  // It names the gestures of the device it is on.
+  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer:coarse)').matches;
   const hint = document.createElement('div');
   hint.className = 'fs-hint';
   hint.dataset.gone = 'false';
-  hint.textContent = 'Drag to pan · scroll to zoom · click a unit';
+  hint.textContent = coarse ? 'Drag to pan · pinch to zoom · tap a unit' : 'Drag to pan · scroll to zoom · click a unit';
   container.appendChild(hint);
   let hintTimer = setTimeout(() => { hint.dataset.gone = 'true'; }, 9000);
   function touched() {
@@ -279,7 +319,7 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
     // Travel accumulates. A slow pan is made of small steps, and measuring only
     // the largest of them would read a long drag as a tap.
     dragged += Math.hypot(dx, dy);
-    if (dragged > 6) touched();
+    if (dragged > 6) { touched(); handled = true; }
     if (active.size >= 2) {
       const now = spread();
       if (pinch > 0 && now > 0) { const c = centre(); zoomAt(c.x, c.y, now / pinch); }
@@ -301,6 +341,7 @@ export function createFlowsheet(container, spec, { onSelect, onHover } = {}) {
   root.addEventListener('dblclick', fit);
   panDistance = () => dragged;
   const stopGestures = () => {
+    sizeWatch.disconnect();
     removeEventListener('pointermove', onMove);
     removeEventListener('pointerup', onRelease);
     removeEventListener('pointercancel', onRelease);

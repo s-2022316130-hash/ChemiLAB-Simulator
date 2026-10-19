@@ -24,7 +24,7 @@ export function equipmentCard(info, liveValues = null) {
       body: [el('div', { class: 'empty' }, [
         el('div', { class: 'glyph', html: icon('cursor') }),
         el('b', { text: 'Nothing selected' }),
-        el('p', { text: 'Click a unit in the 3D plant or on the flowsheet. Both views select together.' })
+        el('p', { text: 'Tap or click a unit in the 3D plant or on the flowsheet. Both views select together.' })
       ])]
     });
   }
