@@ -436,11 +436,32 @@ Three column widths, one component language:
 |---|---|
 | above 1180 px | three columns — controls, views, results rail |
 | 901–1180 px | views full width, controls and rail side by side under them |
-| below 900 px | four screens, bottom navigation, floating run action, bottom sheet for equipment |
+| below 900 px, or a touch screen under 520 px tall | four screens, a tab bar, floating run action, bottom sheet for equipment |
 
 The phone layout is a CSS decision driven by `data-active` attributes, so nothing is
 rebuilt when the window changes size and the WebGL context is never lost — a tab that
 unmounted the canvas would have to recompile every shader on the way back.
+
+The second clause matters: a large phone on its side is more than 900 px wide and
+about 400 tall, and the tablet layout would give its plant a strip 200 px high. Every
+phone query in `theme.css` reads `(max-width:900px), (max-height:520px) and
+(pointer:coarse)`, and `ui/workspace.js` asks the same before it opens the sheet.
+Held sideways (`max-height:520px` and landscape) the tab bar becomes a rail down the
+left edge, the masthead comes down to 44 px, and both sides keep clear of the notch.
+
+On a phone the plant and the diagram are full screens, so their panel titles leave the
+screen (they stay in the outline) — the tab already names them. The plant gives up its
+header entirely: Export floats in the corner and the canvas takes the whole panel, with
+the caption switch and the colour modes on one scrolling row. The diagram keeps its bar,
+and on a panel too narrow to show it legibly it opens on the feed end at about 11 px
+tags, as tall as the panel allows (`startView()` in `flowsheet/view2d.js`); Fit still
+shows the whole, and once the reader has moved the view it is left alone. Scrolling
+screens keep their foot clear of the Run button and contain their overscroll, so a pull
+at the top of the controls never reloads the page. Every field is 16 px on a touch
+screen, because iOS zooms into anything smaller on focus and does not zoom back. The
+equipment sheet has a close button as well as its gestures, is `inert` while it is
+down, and dismissing it clears the selection — otherwise the unit stays selected behind
+it and tapping it again changes nothing.
 
 On a phone (≤ 640 px) the overview's library tiles become cards with the plant as a
 band above the text, at full strength, rather than a photograph dimmed behind it — with
@@ -512,6 +533,13 @@ plot on screen and delivers the plant as a small object in a large sky; covering
 the shortfall crops a little off each end at a size worth looking at, and the view pans
 and pinches.
 
+Upright (aspect below 1) the camera also looks down from higher up — up to 22° more,
+never past 66° — which turns the depth of the plot into height on the screen, so it
+covers only 18 % of the shortfall rather than 35 %. Landscape panels are untouched. On a
+handheld, captions that would land on a nearer one fade out (nearest first, the selected
+unit always shown), because thirty plates in a phone's width are one smudge, not thirty
+labels.
+
 ## Performance
 
 One `requestAnimationFrame` loop for the whole app (`shared/animation.js`), which
@@ -523,7 +551,27 @@ decisions are made on work time and the frame rate is reported only when it is r
 `createQualityGovernor` publishes a continuous `quality` (tracer density) and a
 `tier`, and `scene/renderer.js` maps the tier onto multisampling, render scale, shadow
 resolution and the bloom pass. Demotions in the first seconds do not count, and a tier
-that has failed twice is not tried again, so nothing visibly oscillates.
+that has failed twice is not tried again, so nothing visibly oscillates. The renderer
+feeds it one `sample()` per frame it actually drew: a frame it skipped costs nothing,
+and averaging those in would read as headroom and promote a tier the machine cannot hold.
+
+- **Shaders compile before the first frame.** three.js compiles a material when
+  something wearing it is first drawn and waits for the driver while it does — on a
+  slowed phone that was 2–3 s with the page frozen, and again for each unit first
+  turned into view. The renderer calls `compileAsync` for the whole scene (off-screen
+  units included), the caption scene and the bloom pass's quads, for the composer's
+  render target, and draws once they are ready; the canvas says "Preparing the 3D plant"
+  meanwhile. The screen-target set — what the low tier draws with — follows when the
+  page is idle, so dropping to that tier no longer freezes on the way down.
+- **A phone at rest is drawn at 30 fps.** One and a half seconds after the last touch,
+  with no camera flight or colour glide under way, frames alternate; time skipped is
+  carried into the next frame drawn, so nothing animates slower. Every frame on a phone
+  is battery and heat, and heat is what makes it throttle a minute later.
+
+Measured on the production build with the CPU slowed four times at phone size, opening
+water treatment went from 6.6 s of blocked main thread to 4.1 s, and the stalls after
+the loading card from 2.1 s and 1.4 s to 0.7 s. What remains is building the plant and
+the first upload of its geometry.
 
 What keeps the frame cheap:
 
