@@ -36,6 +36,7 @@ npm run build:single # the same site as one self-contained .html file
 npm run preview      # serve the production build
 npm run verify       # structural and behavioural checks on all five engines
 npm run backdrops    # re-photograph the five plants for the gallery tiles
+npm run hero-film    # re-film the gas plant for the overview hero (needs ffmpeg)
 ```
 
 Node 18 or newer.
