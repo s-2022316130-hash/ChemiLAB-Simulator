@@ -24,7 +24,10 @@
      7  form            radius, spacing, type, shadow, motion
    =========================================================================== */
 
-:root{
+/* The dark palette is the root's, and also any element's that asks for it with
+   data-theme="dark" — the overview's hero is a view into a plant at night in
+   either theme, so it carries the dark tokens itself rather than copies of them. */
+:root,[data-theme="dark"]{
   color-scheme:dark;
 
   /* --- 1  neutral ramp -----------------------------------------------------
@@ -206,15 +209,10 @@
   --grid-line:rgba(140,170,210,.045);
   --grid-size:46px;
 
-  /* The overview as a drawing plate (HOME in theme.css). Brass is the one
-     accent it adds, and it is used only as a rule or a small figure, never as
-     a fill: the fine lines of a sheet border and the numbers in a title block,
-     the way brass turns up on an instrument as a bezel and not as the dial. */
+  /* The overview's ground (HOME in theme.css): ink with a faint warm pool of
+     light and a grain, so the page below the hero reads as a surface. */
   --ground-a:#070b12; --ground-b:#0a1019;
-  --plate:#0b121c; --plate-hi:#0e1724;
   --brass:#c6a36b;
-  --brass-line:rgba(198,163,107,.36); --brass-rule:rgba(198,163,107,.17); --brass-ink:rgba(198,163,107,.7);
-  --engrave:rgba(150,178,210,.10); --engrave-mid:rgba(150,178,210,.17); --engrave-sat:rgba(198,163,107,.46);
   --grain:.075;
   --veil-a:color-mix(in srgb, var(--hue) 14%, transparent);
   --veil-b:color-mix(in srgb, #3f6fd8 9%, transparent);
@@ -263,6 +261,18 @@
   --dur-enter:460ms;         /* a page, or a panel, arriving */
   --dur-slide:300ms;         /* an indicator moving between positions */
   --stagger:55ms;            /* the beat between things arriving together */
+
+  /* --- 8  the overview's film -----------------------------------------------
+     The hero runs a film of the gas plant at night (app/heroFilm.js). These
+     are the ground it sits on and the labels that ride on it: cyan for the
+     tags, as the gas lines in the film are, on a near-black that matches the
+     film's own sky so the shade over it never shows an edge. */
+  --tw-ground:#05080d;
+  --tw-gas:#4fd8ea;
+  --tw-tag:#bfeef6;
+  --tw-tag-line:rgba(79,216,234,.42);
+  --tw-tag-fill:rgba(5,8,13,.78);
+  --tw-readout:rgba(5,8,13,.84);
 }
 
 /* ===========================================================================
@@ -369,10 +379,7 @@
   --grid-line:rgba(40,70,110,.055);
   /* Laboratory porcelain, not cream: a cool white with graphite ink. */
   --ground-a:#eef1f4; --ground-b:#f4f6f8;
-  --plate:#fbfcfd; --plate-hi:#ffffff;
   --brass:#86662b;
-  --brass-line:rgba(134,102,43,.42); --brass-rule:rgba(134,102,43,.2); --brass-ink:rgba(134,102,43,.78);
-  --engrave:rgba(40,70,110,.085); --engrave-mid:rgba(40,70,110,.15); --engrave-sat:rgba(134,102,43,.5);
   --grain:.05;
   --veil-a:color-mix(in srgb, var(--hue) 10%, transparent);
   --veil-b:color-mix(in srgb, #3f6fd8 7%, transparent);

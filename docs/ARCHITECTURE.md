@@ -201,18 +201,47 @@ and the sky. It is set before the workspace mounts, because the renderer reads i
 construction. Entering a simulator is meant to feel like entering a different facility
 while the system around it stays identical.
 
-### The overview plate
+### The overview hero
 
-The overview is laid out as a drawing sheet rather than a landing page: the hero is a
-plate with a double border, ISO 5457 zone references and centring marks, a title block
-of what the library holds, and behind the headline a psychrometric chart
-(`app/psychro.js`). The chart is computed, not drawn — Magnus–Tetens saturation
-pressure, humidity ratio `w = 0.621945 φ p_s / (P − φ p_s)` and moist-air enthalpy at
-101.325 kPa — and carries no state; it is the subject's own drawing used as ground, and
-it engraves itself once when the page opens (paths in order, grid first, saturation
-last). The home-only ground, grain and brass rules come from `--ground-*`, `--plate*`,
-`--brass*` and `--engrave*` tokens under `:root[data-page="home"]`, which the overview
-sets on mount and removes on dispose, so no other page inherits them.
+The overview opens on a film of a working plant: unit 05, the natural gas processing
+plant, rendered from the simulator's own three.js scene running at its base case — the
+same geometry, reflection probe and tone mapping the workspace draws, with the flare lit
+and the stream tracers moving. It is not stock footage and not generated imagery; a
+plant that is rebuilt is re-filmed with `npm run hero-film`.
+
+**Capture.** `tools/hero-video.html` installs a virtual clock before any module loads
+(`requestAnimationFrame` and `performance.now` are driven by `__clock.step(ms)`), so
+every frame is exactly 1/30 s after the last however long it took to render, and the
+quality governor — which measures work with the same clock — holds the top tier.
+`tools/heroVideo.js` frames a cluster of the plant's own presets (low, from the
+south-east, pushed right so the left is open for the headline) and moves the camera on
+a closed path: a few degrees of orbit, a little rise and a slight push in. Each frame is
+drawn by `view.snapshot()`, which also returns where every unit landed in the picture.
+`scripts/capture-hero-film.mjs` keeps the frames in `.cache/hero-film/` and, with
+ffmpeg, renders one second past the loop and cross-fades it over the opening so the film
+has no seam; then encodes `assets/hero/`: 1600 × 900 H.264 and VP9, 960 × 540 for
+phones, the first frame as the poster, and the label track at ten samples a second.
+
+**The hero** (`app/twinHero.js`, `app/heroFilm.js`). The film covers the hero with a
+shade that darkens the plot under the headline; text over it is measured against the
+film's brightest pixels, not its average. Each labelled unit carries a tag that rides on
+it from the track, hidden where it would land under the headline. What is written about
+a unit is the simulator's own: names and purposes from the equipment cards, readings
+from the engine's base case solved in the browser (em dashes until then). Focus or hover
+previews a unit and draws a leader to the readout, Enter or a tap pins it, Escape
+releases it; a phone gets the units as a row of buttons under the film.
+
+The film loads after first paint and plays only while the hero is on screen. Phones get
+the small encode and never the large; reduced motion or reduced data gets the poster
+alone — the film's own first frame, labelled — and no video is fetched. The single-file
+build aliases `heroFilm.js` to `heroFilm.still.js`, so the one-file copy carries the
+poster and the track but not several megabytes of base64 video.
+
+The hero is a view into a plant at night in both themes: it carries `data-theme="dark"`,
+and the dark token rule matches `:root,[data-theme="dark"]`, so everything inside it —
+buttons and focus rings included — takes the dark palette while the page below follows
+the theme. The home-only ground and grain come from `--ground-*` and `--grain` under
+`:root[data-page="home"]`, which the overview sets on mount and removes on dispose.
 
 Type is Inter for the interface, Source Serif 4 for display on the overview, IBM Plex
 Mono for tags and values. All three are bundled from `@fontsource` (OFL 1.1) through

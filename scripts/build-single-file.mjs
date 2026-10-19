@@ -45,6 +45,13 @@ await build({
   root,
   base: './',
   logLevel: 'warn',
+  // The overview's film stays out of the one-file copy: inlined as base64 it
+  // would make the file several times its size for a background. The still
+  // variant carries the poster and the label track, so the hero opens on the
+  // plant's first frame, labelled, exactly as it does under reduced motion.
+  resolve: {
+    alias: [{ find: /^\.\/heroFilm\.js$/, replacement: join(root, 'src', 'app', 'heroFilm.still.js') }]
+  },
   build: {
     outDir: staging,
     emptyOutDir: true,

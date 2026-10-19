@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ChemiLAB — hero film capture</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!--
+  A virtual clock, installed before any module loads. The plant animates on
+  requestAnimationFrame and performance.now; here both are driven by
+  __clock.step(ms) instead of by the display, so every frame of the film is
+  exactly one thirtieth of a second after the last however long it took to
+  render. The quality governor measures work with the same clock, sees none,
+  and holds the top tier throughout.
+-->
+<script>
+(() => {
+  let now = 0, id = 0;
+  const queue = new Map();
+  performance.now = () => now;
+  window.requestAnimationFrame = cb => { queue.set(++id, cb); return id; };
+  window.cancelAnimationFrame = i => { queue.delete(i); };
+  window.__clock = {
+    step(ms) {
+      now += ms;
+      const due = [...queue.values()];
+      queue.clear();
+      for (const cb of due) cb(now);
+    },
+    get now() { return now; }
+  };
+})();
+document.documentElement.dataset.theme = 'dark';
+</script>
+<link rel="stylesheet" href="../src/shared/theme.css" />
+<style>
+  body{margin:0;padding:18px;background:var(--bg-0);color:var(--ink);font:13px/1.5 var(--font,system-ui)}
+  h1{font-size:15px;margin:0 0 4px}
+  p{margin:0 0 14px;color:var(--ink-faint)}
+  #stage{width:1920px;height:1080px;position:fixed;left:-4000px;top:0}
+  #log{font-family:var(--mono,monospace);font-size:12px;white-space:pre-wrap;line-height:1.7}
+  #preview{max-width:960px;width:100%;margin-top:14px;border-radius:8px;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<h1>Hero film capture</h1>
+<p>Renders the natural gas plant as a looping film for the overview and posts every frame to the capture server. Development only.</p>
+<div id="log">starting…</div>
+<img id="preview" alt="" />
+<div id="stage"></div>
+<script type="module" src="./heroVideo.js"></script>
+</body>
+</html>

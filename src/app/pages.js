@@ -5,8 +5,7 @@ import { invalidateTokens } from '../shared/theme.js';
 import { icon } from '../shared/icons.js';
 import { previewNode } from './previews.js';
 import { backdropFor } from './backdrops.js';
-import { psychroChart } from './psychro.js';
-import { heroPlantNode } from './heroPlant.js';
+import { twinHero } from './twinHero.js';
 import { signature, AUTHOR } from '../shared/components/signature.js';
 import { reducedMotion } from '../shared/motion.js';
 import { createLiveTiles } from './liveTiles.js';
@@ -49,45 +48,14 @@ export function homePage(view, { section = null } = {}) {
     el('div', { class: 'capgrid' }, CAPABILITIES.map(capCard))
   );
 
-  const page = el('div', { class: 'home' }, [
-    // The hero is a drawing plate: a sheet border with zone references and
-    // centring marks, an engraved psychrometric chart as its ground, the plant
-    // in elevation, and the facts in a title block. Every piece of it is
-    // drawing-office furniture that a drawing actually carries.
-    el('section', { class: 'hero plate' }, [
-      plateFrame(),
-      el('figure', { class: 'plate-chart' }, [
-        psychroChart(),
-        el('figcaption', { text: 'Psychrometric chart at 101.325 kPa' })
-      ]),
-      el('div', { class: 'hero-copy' }, [
-        el('h1', { text: 'Run the plant. Then find out why it behaves that way.' }),
-        el('p', { class: 'lede', text: 'Change an operating condition, solve the balances, and watch the same solved state appear in the 3D plant, the flowsheet, the results rail and the equations behind them. Not an animation of a process — a process model with a plant drawn on top of it.' }),
-        el('div', { class: 'cta' }, [
-          // A link to the library route rather than a scroll of its own, so the
-          // masthead nav follows it and the address says where you are.
-          el('a', { class: 'btn primary', href: href.simulators, text: 'Explore the simulators' }),
-          el('button', {
-            class: 'btn',
-            html: `${icon('book')} How it works`,
-            onClick: () => goTo(how)
-          })
-        ])
-      ]),
-      el('div', { class: 'hero-art' }, [heroPlantNode()]),
-      // The facts about the library, as a title block records a drawing’s:
-      // counted from the registry, each one a count of something that exists.
-      el('dl', { class: 'titleblock' }, [
-        cell('Process units', TOTALS.simulators),
-        cell('Tagged equipment', TOTALS.units),
-        cell('Faults to diagnose', TOTALS.faults),
-        cell('Guided tour steps', TOTALS.tourSteps)
-      ])
-    ]),
-    gallery,
-    how,
-    siteFooter(),
-    signature()
+  // The hero opens on a working plant, edge to edge, in the dark of a plot at
+  // night whatever the theme; the library and the rest of the page follow it
+  // in the usual column. See twinHero.js.
+  const hero = twinHero({ onHow: () => goTo(how) });
+  hero.node.dataset.theme = 'dark';
+  const page = el('div', { class: 'home-page' }, [
+    hero.node,
+    el('div', { class: 'home' }, [gallery, how, siteFooter(), signature()])
   ]);
 
   clear(view).appendChild(page);
@@ -102,7 +70,7 @@ export function homePage(view, { section = null } = {}) {
   return {
     // Leaving the overview hands the preview renderer’s GPU context straight
     // back: the simulator being opened is about to want one.
-    dispose() { live.dispose(); delete document.documentElement.dataset.page; },
+    dispose() { hero.dispose(); live.dispose(); delete document.documentElement.dataset.page; },
     // The overview and the library are one page, so moving between them is a
     // scroll to the right place rather than a rebuild of the same page.
     navigate(route) {
@@ -120,29 +88,6 @@ export function homePage(view, { section = null } = {}) {
 export function simulatorsPage(view) { return homePage(view, { section: 'library' }); }
 
 /* --- pieces ---------------------------------------------------------------- */
-
-/** One cell of the title block: what it records, then the figure. */
-function cell(label, value) {
-  return el('div', {}, [el('dt', { text: label }), el('dd', { text: String(value) })]);
-}
-
-/**
- * The sheet border. Two rules with the zone references between them — columns
- * 1 to 8 along the top and foot, rows A to D down the sides — and a centring
- * mark at the middle of each edge, as a drawing sheet is laid out (ISO 5457).
- * Decorative to a screen reader, so it is hidden from one.
- */
-function plateFrame() {
-  const zones = (n, cls, label) => el('div', { class: `zones ${cls}` },
-    Array.from({ length: n }, (_, i) => el('span', { text: label(i) })));
-  const num = i => String(i + 1), row = i => 'ABCD'[i];
-  return el('div', { class: 'plate-frame', 'aria-hidden': 'true' }, [
-    zones(8, 'z-top', num), zones(8, 'z-bottom', num),
-    zones(4, 'z-left', row), zones(4, 'z-right', row),
-    el('i', { class: 'cmark cm-t' }), el('i', { class: 'cmark cm-b' }),
-    el('i', { class: 'cmark cm-l' }), el('i', { class: 'cmark cm-r' })
-  ]);
-}
 
 function sectionHead(kicker, title, body) {
   // The kicker is no longer drawn: a tracked-capitals label over a heading
