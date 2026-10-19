@@ -336,8 +336,10 @@ export function mountWorkspace(root, sim) {
 
   // On a phone the equipment card comes up over the view it was selected from
   // rather than sending you to another screen to read it.
-  const sheet = createSheet(document.body);
-  const onPhone = () => { try { return matchMedia('(max-width:900px)').matches; } catch { return false; } };
+  const sheet = createSheet(document.body, { onDismiss: () => store.set({ selection: null }) });
+  // The same question theme.css asks: narrow, or a short touch screen — a phone
+  // on its side is wider than 900 px and gets the phone layout all the same.
+  const onPhone = () => { try { return matchMedia('(max-width:900px), (max-height:520px) and (pointer:coarse)').matches; } catch { return false; } };
 
   // ---- state fan-out --------------------------------------------------
   function equipmentEntry(s) {
