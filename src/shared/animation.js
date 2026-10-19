@@ -90,6 +90,12 @@ export const smoothstep = k => { const x = Math.min(Math.max(k, 0), 1); return x
  * Both move with dwell time and hysteresis. A governor that reacts to a single
  * slow frame oscillates, and an oscillating renderer looks far worse than a
  * consistently simpler one.
+ *
+ * The renderer feeds it, one `sample()` per frame it actually drew, rather than
+ * the governor reading the shared loop. A frame the renderer skipped — while
+ * its shaders compile, or because a phone at rest is drawn at half rate — costs
+ * nothing, and averaging those in would read as headroom and promote a tier
+ * the machine cannot hold.
  */
 export function createQualityGovernor({ budgetMs = 13.5, headroomMs = 9.5, startTier = 'high' } = {}) {
   const TIERS = ['low', 'medium', 'high'];
@@ -99,6 +105,7 @@ export function createQualityGovernor({ budgetMs = 13.5, headroomMs = 9.5, start
   let quality = 1, tierIndex = Math.max(0, TIERS.indexOf(startTier));
   let below = 0, above = 0, settle = 2.5, age = 0;   // seconds out of band, and since start
   let fps = null, fpsAge = 0;               // null until a real interval is seen
+  let work = 4;                             // smoothed milliseconds per drawn frame
   // A tier that has failed twice is not tried again. Without this ratchet a
   // machine that sits just the wrong side of the budget oscillates between two
   // tiers every few seconds, and bloom switching on and off looks far worse
@@ -107,19 +114,20 @@ export function createQualityGovernor({ budgetMs = 13.5, headroomMs = 9.5, start
   const failures = [0, 0, 0];
   const listeners = new Set();
 
-  const off = onFrame(dt => {
+  /** One drawn frame: `dt` seconds since the last one, `ms` of work to draw it. */
+  function sample(dt, ms) {
     if (dt <= 0) return;
     // Ignore the opening seconds outright: shader compilation and texture
     // upload make the first frames unrepresentative of anything.
     if (settle > 0) { settle -= dt; return; }
     age += dt;
+    work += (ms - work) * 0.08;
 
-    // Frame rate is only meaningful when the browser is actually asking for
-    // frames at display rate. A gap longer than 100 ms is a stall or a
-    // throttled tab, not a slow renderer, so it is not counted.
-    const raw = lastInterval();
-    if (raw > 0.004 && raw < 0.1) {
-      fps = fps === null ? 1 / raw : fps + ((1 / raw) - fps) * 0.06;
+    // Frame rate is only meaningful when frames are being drawn steadily. A gap
+    // longer than 100 ms is a stall or a throttled tab, not a slow renderer, so
+    // it is not counted.
+    if (dt > 0.004 && dt < 0.1) {
+      fps = fps === null ? 1 / dt : fps + ((1 / dt) - fps) * 0.06;
       fpsAge = 0;
     } else {
       fpsAge += dt;
@@ -128,7 +136,6 @@ export function createQualityGovernor({ budgetMs = 13.5, headroomMs = 9.5, start
 
     // Quality follows the cost of the work, which is measurable whatever the
     // browser is doing with the frames afterwards.
-    const work = frameWork();
     if (work > budgetMs) { below += dt; above = 0; }
     else if (work < headroomMs) { above += dt; below = 0; }
     else { below = Math.max(below - dt, 0); above = Math.max(above - dt, 0); }
@@ -152,17 +159,18 @@ export function createQualityGovernor({ budgetMs = 13.5, headroomMs = 9.5, start
     else if (work < headroomMs && quality < 1) quality = Math.min(1, quality + dt * 0.2);
 
     if (wasTier !== tierIndex) for (const fn of listeners) fn(TIERS[tierIndex]);
-  });
+  }
 
   return {
-    /** Measured frames per second, or null when the browser is not asking for frames at display rate. */
+    sample,
+    /** Frames drawn per second, or null when frames are not being drawn steadily. */
     get fps() { return fps; },
-    /** Milliseconds of work per frame — what the renderer actually costs. */
-    get workMs() { return frameWork(); },
+    /** Milliseconds of work per drawn frame — what the renderer actually costs. */
+    get workMs() { return work; },
     get quality() { return quality; },
     get tier() { return TIERS[tierIndex]; },
     /** Called whenever the tier changes, so a renderer can reconfigure once. */
     onTier(fn) { listeners.add(fn); return () => listeners.delete(fn); },
-    dispose() { off(); listeners.clear(); }
+    dispose() { listeners.clear(); }
   };
 }
